@@ -375,7 +375,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const COLS = ['Reginaldo','Francisco','Roberto','Antonio','Bruno','Tassio','Berdenego','Mezaque','Grandão','Cristiano'];
 const FRAC = [{l:'100% (dia inteiro)',v:1},{l:'75%',v:.75},{l:'50%',v:.5},{l:'25%',v:.25}];
 
-const st = { editId:null, pessoas:[], fotosNovas:[], fotosExistentes:[] };
+const st = { editId:null, pessoas:[], fotosNovas:[], fotosExistentes:[], fotosOriginais:[] };
 const $ = id => document.getElementById(id);
 
 $('data').valueAsDate = new Date();
@@ -489,7 +489,10 @@ window.loadEdit = async function(id){
     const r=regs[0]; if(!r)return;
     st.editId=id;
     st.pessoas=cols.map(c=>({nome:c.nome,fracao:c.fracao,tarefa:c.tarefa}));
-    st.fotosNovas=[]; st.fotosExistentes=await listarFotos(id);
+    st.fotosNovas=[];
+    const fotosCarregadas = await listarFotos(id);
+    st.fotosExistentes=[...fotosCarregadas];
+    st.fotosOriginais=[...fotosCarregadas]; // guarda original para comparar
     $('obra').value=r.obra; $('data').value=r.data;
     $('encarregado').value=r.encarregado||'';
     $('tarefas').value=r.tarefas||''; $('obs').value=r.obs||'';
@@ -503,7 +506,7 @@ window.loadEdit = async function(id){
 };
 
 function clear(){
-  st.editId=null; st.pessoas=[]; st.fotosNovas=[]; st.fotosExistentes=[];
+  st.editId=null; st.pessoas=[]; st.fotosNovas=[]; st.fotosExistentes=[]; st.fotosOriginais=[];
   $('obra').value=''; $('encarregado').value=''; $('tarefas').value=''; $('obs').value='';
   $('data').valueAsDate=new Date(); $('banner').style.display='none';
   $('btn-cancel').style.display='none'; $('btn-salvar').textContent='Salvar Registro';
@@ -589,6 +592,18 @@ $('btn-salvar').addEventListener('click',async()=>{
     }
     const cols=st.pessoas.filter(p=>p.nome).map(p=>({registro_id:registroId,nome:p.nome,fracao:p.fracao,tarefa:p.tarefa}));
     if(cols.length) await api('colaboradores',{method:'POST',body:JSON.stringify(cols)});
+
+    // Deletar fotos removidas pelo usuário
+    if(st.fotosOriginais && st.fotosOriginais.length){
+      const removidas = st.fotosOriginais.filter(url => !st.fotosExistentes.includes(url));
+      for(const url of removidas){
+        try{
+          const path = url.split('/object/public/'+BUCKET+'/')[1];
+          await sb.storage.from(BUCKET).remove([path]);
+        }catch(fe){ console.error('Erro ao deletar foto:', fe); }
+      }
+    }
+
     let fotosOk=0,fotosErr=0;
     for(const file of st.fotosNovas){
       try{await uploadFoto(file,registroId);fotosOk++;}
