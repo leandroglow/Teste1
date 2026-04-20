@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Diário de Obras · Ágora Construtora</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   /* ── Tokens Ágora Construtora ── */
   :root {
@@ -368,6 +369,9 @@ const SUPABASE_URL = 'https://pderpmbmurtagpdsvzjg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
 const BUCKET = 'fotos-obras';
 
+// Inicializa SDK oficial do Supabase
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const COLS = ['Reginaldo','Francisco','Roberto','Antonio','Bruno','Tassio','Berdenego','Mezaque','Grandão','Cristiano'];
 const FRAC = [{l:'100% (dia inteiro)',v:1},{l:'75%',v:.75},{l:'50%',v:.5},{l:'25%',v:.25}];
 
@@ -378,6 +382,7 @@ $('data').valueAsDate = new Date();
 
 function sbar(msg,t){ const e=$('sbar'); e.innerHTML=msg; e.className=t; }
 
+// REST API helper (para tabelas)
 async function api(path, opts={}) {
   const res = await fetch(SUPABASE_URL+'/rest/v1/'+path, {
     headers: {
@@ -393,32 +398,29 @@ async function api(path, opts={}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// Upload via SDK oficial (resolve CORS e autenticação)
 async function uploadFoto(file, registroId) {
   const ext = (file.name.split('.').pop()||'jpg').toLowerCase();
   const path = registroId+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.'+ext;
-  const res = await fetch(SUPABASE_URL+'/storage/v1/object/'+BUCKET+'/'+path, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer '+SUPABASE_KEY,
-      'Content-Type': file.type||'image/jpeg',
-      'x-upsert': 'true'
-    },
-    body: file
+  const { data, error } = await sb.storage.from(BUCKET).upload(path, file, {
+    contentType: file.type || 'image/jpeg',
+    upsert: true
   });
-  if (!res.ok) { const txt=await res.text(); throw new Error('Upload falhou: '+txt); }
-  return SUPABASE_URL+'/storage/v1/object/public/'+BUCKET+'/'+path;
+  if (error) throw new Error('Upload falhou: '+error.message);
+  const { data: urlData } = sb.storage.from(BUCKET).getPublicUrl(path);
+  return urlData.publicUrl;
 }
 
+// Listar fotos via SDK oficial
 async function listarFotos(registroId) {
-  const res = await fetch(SUPABASE_URL+'/storage/v1/object/list/'+BUCKET+'/'+registroId, {
-    method: 'POST',
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({limit:100,offset:0})
-  });
-  if (!res.ok) return [];
-  const files = await res.json();
-  return (files||[]).map(f=>SUPABASE_URL+'/storage/v1/object/public/'+BUCKET+'/'+registroId+'/'+f.name);
+  const { data, error } = await sb.storage.from(BUCKET).list(registroId, { limit: 100 });
+  if (error || !data) return [];
+  return data
+    .filter(f => f.name && !f.name.startsWith('.'))
+    .map(f => {
+      const { data: urlData } = sb.storage.from(BUCKET).getPublicUrl(registroId+'/'+f.name);
+      return urlData.publicUrl;
+    });
 }
 
 // Conectar
