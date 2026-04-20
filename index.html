@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diário de Obras</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f3; color: #1a1a1a; padding: 1rem; max-width: 720px; margin: 0 auto; }
+  input, select, textarea, button {
+    font-family: inherit; font-size: 14px;
+    border: 0.5px solid #ccc; border-radius: 8px;
+    padding: 8px 10px; background: #fff; color: #1a1a1a;
+    outline: none; transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #888; }
+  button { cursor: pointer; background: transparent; }
+  button:hover { background: #f0f0ee; }
+  .card { background: #fff; border: 0.5px solid #e0e0dc; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .label { font-size: 13px; color: #666; display: block; margin-bottom: 4px; }
+  .hint { font-size: 12px; color: #999; margin-bottom: 10px; }
+  .metric { background: #f5f5f3; border-radius: 8px; padding: 12px; }
+  .metric p:first-child { font-size: 13px; color: #666; }
+  .metric p:last-child { font-size: 24px; font-weight: 500; margin-top: 4px; }
+  .row-sep { border-bottom: 0.5px solid #e8e8e4; padding: 6px 0; font-size: 14px; display: flex; justify-content: space-between; }
+  .tab-bar { display: flex; gap: 4px; border-bottom: 0.5px solid #e0e0dc; margin-bottom: 1.25rem; }
+  .tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 10px 14px; font-size: 14px; cursor: pointer; color: #888; border-radius: 0; }
+  .tab.active { border-bottom-color: #1a1a1a; font-weight: 500; color: #1a1a1a; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; padding: 10px 18px; }
+  .btn-primary:hover { background: #333; }
+  .btn-danger { color: #c0392b; border: none; }
+  .banner { background: #e8f0fe; border: 0.5px solid #4a90d9; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13px; color: #1a4a8a; display: none; }
+  .colab-card { background: #f5f5f3; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+  .foto-wrap { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 0.5px solid #ddd; }
+  .foto-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .foto-rm { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 8px; align-items: center; }
+  .empty { font-size: 13px; color: #aaa; margin: 8px 0 0; }
+  .compilado-box { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; margin-top: 10px; display: none; }
+  .citem { padding: 3px 0; font-size: 13px; line-height: 1.7; }
+  .citem + .citem { border-top: 0.5px solid #e8e8e4; }
+  .total-hd { font-size: 13px; color: #666; text-align: right; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid #e8e8e4; display: none; }
+  .hist-comp { font-size: 13px; background: #f5f5f3; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+  .prow { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 0.5px solid #e8e8e4; font-size: 13px; }
+  .add-foto-lbl { display: inline-block; padding: 6px 12px; font-size: 12px; border: 0.5px solid #ccc; border-radius: 8px; cursor: pointer; }
+  .add-foto-lbl:hover { background: #f0f0ee; }
+  #sbar { font-size: 12px; text-align: center; padding: 6px 10px; border-radius: 8px; margin-bottom: 1rem; }
+  .sok  { background: #e6f4ea; color: #2d6a4f; border: 0.5px solid #b7dfca; }
+  .serr { background: #fdecea; color: #a93226; border: 0.5px solid #f5b7b1; }
+  .sload { background: #fef9e7; color: #7d6608; border: 0.5px solid #f9e79f; }
+  .hist-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px,1fr)); gap:6px; margin-bottom:10px; }
+  .hist-foto { aspect-ratio:1; border-radius:6px; overflow:hidden; border:0.5px solid #ddd; }
+  .hist-foto img { width:100%; height:100%; object-fit:cover; cursor:pointer; }
+  .spinner { display:inline-block; width:12px; height:12px; border:2px solid #ccc; border-top-color:#333; border-radius:50%; animation:spin .6s linear infinite; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="sbar" class="sload">⏳ Conectando ao banco de dados...</div>
+
+<div class="tab-bar">
+  <button class="tab active" id="tab-novo">Registro</button>
+  <button class="tab" id="tab-hist">Histórico</button>
+  <button class="tab" id="tab-dash">Dashboard</button>
+</div>
+
+<div id="v-novo">
+  <div class="banner" id="banner"></div>
+
+  <div class="card">
+    <span class="label" style="margin-bottom:8px;font-weight:500">Identificação</span>
+    <div class="grid-2">
+      <div>
+        <label class="label">Obra</label>
+        <select id="obra" style="width:100%">
+          <option value="">Selecione...</option>
+          <option>Casa do Lago AC20</option>
+          <option>Evidencias K21</option>
+          <option>Salto M14</option>
+          <option>Chácara Lobo Guará</option>
+          <option>Milano P4</option>
+          <option>Milano P3</option>
+          <option>Di Roma E6</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Data</label>
+        <input type="date" id="data" style="width:100%" />
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label class="label">Encarregado</label>
+      <input type="text" id="encarregado" placeholder="Seu nome" style="width:100%" />
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="label" style="margin:0;font-weight:500">Colaboradores presentes</span>
+      <button id="add-p" style="padding:4px 10px;font-size:12px">+ colaborador</button>
+    </div>
+    <div id="lista-p"></div>
+    <div class="total-hd" id="total-hd"></div>
+  </div>
+
+  <div class="card">
+    <span class="label" style="font-weight:500">Tarefas executadas no dia</span>
+    <p class="hint">Texto livre. Sugestão: <em>Etapa · O que foi feito · Quantidade</em></p>
+    <textarea id="tarefas" rows="5" style="width:100%;resize:vertical" placeholder="Ex:&#10;Alvenaria sala de estar · assentamento de blocos · 12 m²&#10;Elétrica suíte principal · passagem de eletrodutos · 8 m&#10;Acabamento banheiro social · rejuntamento do piso · 4 m²"></textarea>
+    <div class="compilado-box" id="comp-box">
+      <p style="font-size:12px;color:#666;font-weight:500;margin-bottom:6px">Compilado do dia</p>
+      <div id="comp-txt"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="label" style="margin:0;font-weight:500">Fotos do dia</span>
+      <label for="input-fotos" class="add-foto-lbl">+ adicionar fotos</label>
+      <input type="file" id="input-fotos" accept="image/*" multiple style="display:none" />
+    </div>
+    <div class="galeria" id="galeria"></div>
+  </div>
+
+  <div class="card">
+    <label class="label" style="font-weight:500">Observações</label>
+    <textarea id="obs" rows="3" style="width:100%;resize:vertical" placeholder="Registre qualquer intercorrência, decisão ou ponto de atenção..."></textarea>
+  </div>
+
+  <div style="display:flex;gap:10px;justify-content:flex-end">
+    <button id="btn-cancel" style="padding:10px 18px;display:none">Cancelar edição</button>
+    <button id="btn-salvar" class="btn-primary">Salvar</button>
+  </div>
+</div>
+
+<div id="v-hist" style="display:none"><div id="lista-hist"></div></div>
+<div id="v-dash" style="display:none"><div id="dash-cont"></div></div>
+
+<script>
+const SUPABASE_URL = 'https://pderpmbmurtagpdsvzjg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
+const BUCKET = 'fotos-obras';
+
+const COLS = ['Reginaldo','Francisco','Roberto','Antonio','Bruno','Tassio','Berdenego','Mezaque','Grandão','Cristiano'];
+const FRAC = [{l:'100% (dia inteiro)',v:1},{l:'75%',v:.75},{l:'50%',v:.5},{l:'25%',v:.25}];
+
+const st = { editId: null, pessoas: [], fotosNovas: [], fotosExistentes: [] };
+const $ = id => document.getElementById(id);
+
+$('data').valueAsDate = new Date();
+
+function sbar(msg, t) { const e=$('sbar'); e.innerHTML=msg; e.className=t; }
+
+async function api(path, opts={}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...opts.headers
+    },
+    ...opts
+  });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+async function uploadFoto(file, registroId) {
+  const ext = file.name.split('.').pop();
+  const path = registroId + '/' + Date.now() + '.' + ext;
+  const res = await fetch(SUPABASE_URL + '/storage/v1/object/' + BUCKET + '/' + path, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': file.type
+    },
+    body: file
+  });
+  if (!res.ok) throw new Error('Erro upload foto');
+  return SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + path;
+}
+
+async function deleteFoto(url) {
+  const path = url.split('/object/public/' + BUCKET + '/')[1];
+  await fetch(SUPABASE_URL + '/storage/v1/object/' + BUCKET + '/' + path, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+  });
+}
+
+async function listarFotos(registroId) {
+  const res = await fetch(SUPABASE_URL + '/storage/v1/object/list/' + BUCKET + '/' + registroId, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ limit: 100, offset: 0 })
+  });
+  if (!res.ok) return [];
+  const files = await res.json();
+  return (files||[]).map(f => SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + registroId + '/' + f.name);
+}
+
+sbar('<span class="spinner"></span> Conectando...', 'sload');
+api('registros?select=id&limit=1')
+  .then(() => sbar('✓ Conectado ao banco de dados.', 'sok'))
+  .catch(() => sbar('⚠ Erro ao conectar. Verifique sua internet.', 'serr'));
+
+function dupCheck() {
+  if (st.editId) return;
+  const o=$('obra').value, d=$('data').value, b=$('banner');
+  if (!o||!d) { b.style.display='none'; return; }
+  api('registros?obra=eq.'+encodeURIComponent(o)+'&data=eq.'+d+'&select=id')
+    .then(rows => {
+      if (rows && rows.length) {
+        b.innerHTML = 'Já existe registro de <strong>'+o+'</strong> em '+fd(d)+'. <button onclick="loadEdit('+rows[0].id+')" style="margin-left:6px;padding:2px 8px;font-size:11px">Editar</button>';
+        b.style.display = 'block';
+      } else b.style.display = 'none';
+    }).catch(()=>{});
+}
+$('obra').addEventListener('change', dupCheck);
+$('data').addEventListener('change', dupCheck);
+
+window.loadEdit = async function(id) {
+  sbar('<span class="spinner"></span> Carregando registro...', 'sload');
+  try {
+    const [regs, cols] = await Promise.all([
+      api('registros?id=eq.'+id),
+      api('colaboradores?registro_id=eq.'+id)
+    ]);
+    const r = regs[0]; if (!r) return;
+    st.editId = id;
+    st.pessoas = cols.map(c => ({nome:c.nome, fracao:c.fracao, tarefa:c.tarefa}));
+    st.fotosNovas = [];
+    st.fotosExistentes = await listarFotos(id);
+    $('obra').value = r.obra; $('data').value = r.data;
+    $('encarregado').value = r.encarregado||'';
+    $('tarefas').value = r.tarefas||''; $('obs').value = r.obs||'';
+    $('banner').innerHTML = 'Editando <strong>'+r.obra+'</strong> — '+fd(r.data);
+    $('banner').style.display = 'block';
+    $('btn-cancel').style.display = 'inline-block';
+    $('btn-salvar').textContent = 'Salvar alterações';
+    rP(); rF(); rC(); switchTab('novo');
+    sbar('✓ Registro carregado.', 'sok');
+  } catch(e) { sbar('⚠ Erro ao carregar registro.', 'serr'); }
+};
+
+function clear() {
+  st.editId=null; st.pessoas=[]; st.fotosNovas=[]; st.fotosExistentes=[];
+  $('obra').value=''; $('encarregado').value=''; $('tarefas').value=''; $('obs').value='';
+  $('data').valueAsDate=new Date(); $('banner').style.display='none';
+  $('btn-cancel').style.display='none'; $('btn-salvar').textContent='Salvar';
+  $('comp-box').style.display='none'; rP(); rF();
+}
+$('btn-cancel').addEventListener('click', clear);
+
+function rP() {
+  const c = $('lista-p');
+  if (!st.pessoas.length) { c.innerHTML='<p class="empty">Nenhum colaborador adicionado.</p>'; $('total-hd').style.display='none'; return; }
+  const ja = st.pessoas.map(p=>p.nome).filter(Boolean);
+  c.innerHTML = st.pessoas.map((p,i) => {
+    const opts = COLS.map(n => { const d=ja.includes(n)&&n!==p.nome; return '<option value="'+n+'"'+(p.nome===n?' selected':'')+(d?' disabled':'')+'>'+n+(d?' (já adicionado)':'')+'</option>'; }).join('');
+    const fo = FRAC.map(f => '<option value="'+f.v+'"'+(p.fracao===f.v?' selected':'')+'>'+f.l+'</option>').join('');
+    return '<div class="colab-card"><div class="grid-3" style="margin-bottom:8px"><select data-i="'+i+'" data-c="nome" class="ip"><option value="">Selecione...</option>'+opts+'</select><select data-i="'+i+'" data-c="fracao" class="ip">'+fo+'</select><button class="btn-danger" data-rm="'+i+'" style="padding:6px 10px;font-size:12px">×</button></div><input type="text" placeholder="Tarefa do colaborador..." value="'+esc(p.tarefa||'')+'" data-i="'+i+'" data-c="tarefa" class="ip" style="width:100%;font-size:13px"/></div>';
+  }).join('');
+  c.querySelectorAll('.ip').forEach(el => {
+    el.addEventListener(el.tagName==='SELECT'?'change':'input', e => {
+      const i=+e.target.dataset.i, campo=e.target.dataset.c;
+      st.pessoas[i][campo] = campo==='fracao' ? parseFloat(e.target.value) : e.target.value;
+      if (campo==='nome') rP(); else totHD();
+    });
+  });
+  c.querySelectorAll('[data-rm]').forEach(el => el.addEventListener('click', e => { st.pessoas.splice(+e.target.dataset.rm,1); rP(); }));
+  totHD();
+}
+
+function totHD() {
+  const el=$('total-hd');
+  if (!st.pessoas.length) { el.style.display='none'; return; }
+  const t = st.pessoas.reduce((s,p)=>s+(p.fracao||1),0);
+  el.style.display='block'; el.textContent='Total: '+(Math.round(t*100)/100)+' homens-dia';
+}
+
+function rC() {
+  const txt=($('tarefas').value||'').trim(), box=$('comp-box'), ct=$('comp-txt');
+  const lin=txt.split('\n').filter(l=>l.trim());
+  if (!lin.length) { box.style.display='none'; return; }
+  ct.innerHTML=lin.map((l,i)=>'<div class="citem"'+(i<lin.length-1?' style="border-bottom:0.5px solid #e8e8e4"':'')+'>• '+l.trim()+'</div>').join('');
+  box.style.display='block';
+}
+$('tarefas').addEventListener('input', rC);
+
+function rF() {
+  const c=$('galeria');
+  const todas = [
+    ...st.fotosExistentes.map(url => ({url, nova:false})),
+    ...st.fotosNovas.map(f => ({url: URL.createObjectURL(f), nova:true, file:f}))
+  ];
+  if (!todas.length) { c.innerHTML='<p class="empty" style="grid-column:1/-1">Nenhuma foto adicionada.</p>'; return; }
+  c.innerHTML = todas.map((f,i) => '<div class="foto-wrap"><img src="'+f.url+'" /><button class="foto-rm" data-rf="'+i+'" data-nova="'+(f.nova?1:0)+'">×</button></div>').join('');
+  c.querySelectorAll('[data-rf]').forEach(el => el.addEventListener('click', e => {
+    const i=+e.currentTarget.dataset.rf, nova=+e.currentTarget.dataset.nova;
+    if (nova) st.fotosNovas.splice(i - st.fotosExistentes.length, 1);
+    else st.fotosExistentes.splice(i, 1);
+    rF();
+  }));
+}
+
+function esc(s) { return String(s??'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function fd(iso) { const [y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
+function ff(f) { return ({1:'dia inteiro',.75:'75%',.5:'50%',.25:'25%'})[f]||(f*100)+'%'; }
+
+$('add-p').addEventListener('click', () => { st.pessoas.push({nome:'',fracao:1,tarefa:''}); rP(); });
+$('input-fotos').addEventListener('change', e => {
+  st.fotosNovas.push(...Array.from(e.target.files));
+  rF(); e.target.value='';
+});
+
+$('btn-salvar').addEventListener('click', async () => {
+  const obra=$('obra').value, data=$('data').value;
+  if (!obra||!data) { alert('Selecione a obra e a data.'); return; }
+  sbar('<span class="spinner"></span> Salvando...', 'sload');
+  $('btn-salvar').disabled = true;
+  try {
+    const reg = { obra, data, encarregado: $('encarregado').value.trim(), tarefas: $('tarefas').value.trim(), obs: $('obs').value.trim() };
+    let registroId;
+    if (st.editId) {
+      await api('registros?id=eq.'+st.editId, { method:'PATCH', body: JSON.stringify(reg) });
+      await api('colaboradores?registro_id=eq.'+st.editId, { method:'DELETE' });
+      registroId = st.editId;
+    } else {
+      reg.id = Date.now();
+      await api('registros', { method:'POST', body: JSON.stringify(reg) });
+      registroId = reg.id;
+    }
+    const cols = st.pessoas.filter(p=>p.nome).map(p => ({registro_id: registroId, nome:p.nome, fracao:p.fracao, tarefa:p.tarefa}));
+    if (cols.length) await api('colaboradores', { method:'POST', body: JSON.stringify(cols) });
+    for (const file of st.fotosNovas) await uploadFoto(file, registroId);
+    sbar('✓ Registro salvo com sucesso!', 'sok');
+    clear();
+  } catch(e) {
+    sbar('⚠ Erro ao salvar: '+e.message, 'serr');
+  }
+  $('btn-salvar').disabled = false;
+});
+
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  $('tab-'+t).classList.add('active');
+  $('v-novo').style.display=t==='novo'?'block':'none';
+  $('v-hist').style.display=t==='hist'?'block':'none';
+  $('v-dash').style.display=t==='dash'?'block':'none';
+  if (t==='hist') rH(); if (t==='dash') rD();
+}
+$('tab-novo').addEventListener('click', ()=>switchTab('novo'));
+$('tab-hist').addEventListener('click', ()=>switchTab('hist'));
+$('tab-dash').addEventListener('click', ()=>switchTab('dash'));
+
+async function rH() {
+  const c=$('lista-hist');
+  c.innerHTML='<p style="color:#aaa;font-size:14px;text-align:center;padding:2rem 0"><span class="spinner"></span> Carregando...</p>';
+  try {
+    const regs = await api('registros?select=*&order=data.desc');
+    if (!regs||!regs.length) { c.innerHTML='<p style="color:#aaa;font-size:14px;text-align:center;padding:2rem 0">Nenhum registro salvo ainda.</p>'; return; }
+    const cols = await api('colaboradores?select=*');
+    const colsPorReg = {};
+    cols.forEach(c => { if (!colsPorReg[c.registro_id]) colsPorReg[c.registro_id]=[]; colsPorReg[c.registro_id].push(c); });
+
+    const items = await Promise.all(regs.map(async r => {
+      const fotos = await listarFotos(r.id);
+      return {r, fotos, cols: colsPorReg[r.id]||[]};
+    }));
+
+    c.innerHTML = items.map(({r, fotos, cols}) => {
+      const hd = cols.reduce((s,p)=>s+(p.fracao||1),0);
+      const lin = (r.tarefas||'').split('\n').filter(l=>l.trim());
+      const pH = cols.map(p=>'<div class="prow"><span><strong>'+p.nome+'</strong> <span style="color:#aaa">('+ff(p.fracao||1)+')</span></span><span style="color:#888">'+(p.tarefa||'—')+'</span></div>').join('');
+      const fotosHtml = fotos.length ? '<div class="hist-fotos">'+fotos.map(u=>'<div class="hist-foto"><img src="'+u+'" onclick="window.open(\''+u+'\',\'_blank\')" /></div>').join('')+'</div>' : '';
+      return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><strong style="font-size:15px">'+r.obra+'</strong><span style="font-size:13px;color:#888">'+fd(r.data)+'</span></div>'
+        +'<div style="font-size:13px;color:#888;margin-bottom:10px">'+cols.length+' colaborador'+(cols.length!==1?'es':'')+' · '+(Math.round(hd*100)/100)+' HD · '+fotos.length+' foto'+(fotos.length!==1?'s':'')+'</div>'
+        +(cols.length?'<div style="margin-bottom:10px">'+pH+'</div>':'')
+        +(lin.length?'<div class="hist-comp">'+lin.map(l=>'• '+l.trim()).join('<br>')+'</div>':'')
+        +fotosHtml
+        +(r.obs?'<div style="font-size:13px;color:#888;margin-bottom:10px;font-style:italic">'+r.obs+'</div>':'')
+        +'<div style="display:flex;gap:8px"><button onclick="loadEdit('+r.id+')" style="padding:6px 12px;font-size:12px">Editar</button><button class="btn-danger" data-ex="'+r.id+'" style="padding:6px 12px;font-size:12px">Excluir</button></div></div>';
+    }).join('');
+
+    c.querySelectorAll('[data-ex]').forEach(el => el.addEventListener('click', async e => {
+      if (confirm('Excluir este registro e todas as fotos?')) {
+        const id = +e.target.dataset.ex;
+        sbar('<span class="spinner"></span> Excluindo...', 'sload');
+        try {
+          await api('registros?id=eq.'+id, {method:'DELETE'});
+          sbar('✓ Registro excluído.', 'sok');
+          rH();
+        } catch(err) { sbar('⚠ Erro ao excluir.', 'serr'); }
+      }
+    }));
+  } catch(e) { c.innerHTML='<p style="color:#c0392b;font-size:14px;text-align:center;padding:2rem 0">⚠ Erro ao carregar histórico.</p>'; }
+}
+
+async function rD() {
+  const c=$('dash-cont');
+  c.innerHTML='<p style="color:#aaa;font-size:14px;text-align:center;padding:2rem 0"><span class="spinner"></span> Carregando...</p>';
+  try {
+    const [regs, cols] = await Promise.all([
+      api('registros?select=*'),
+      api('colaboradores?select=*')
+    ]);
+    if (!regs||!regs.length) { c.innerHTML='<p style="color:#aaa;font-size:14px;text-align:center;padding:2rem 0">Salve registros para ver o dashboard.</p>'; return; }
+    const ob={};
+    regs.forEach(r => { if (!ob[r.obra]) ob[r.obra]={dias:0,hd:0,col:{}}; ob[r.obra].dias++; });
+    cols.forEach(p => {
+      const r=regs.find(r=>r.id===p.registro_id); if(!r)return;
+      const f=p.fracao||1; ob[r.obra].hd+=f;
+      ob[r.obra].col[p.nome]=(ob[r.obra].col[p.nome]||0)+f;
+    });
+    c.innerHTML=Object.entries(ob).map(([nome,d])=>'<div class="card"><strong style="font-size:15px;display:block;margin-bottom:12px">'+nome+'</strong><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:1rem"><div class="metric"><p>Dias registrados</p><p>'+d.dias+'</p></div><div class="metric"><p>Homens-dia total</p><p>'+(Math.round(d.hd*100)/100)+'</p></div><div class="metric"><p>Colaboradores</p><p>'+Object.keys(d.col).length+'</p></div></div>'+(Object.keys(d.col).length?'<p style="font-size:13px;color:#888;margin-bottom:6px">HD por colaborador</p><div>'+Object.entries(d.col).sort((a,b)=>b[1]-a[1]).map(([col,hd])=>'<div class="row-sep"><span>'+col+'</span><span><strong>'+(Math.round(hd*100)/100)+'</strong> HD</span></div>').join('')+'</div>':'')+'</div>').join('');
+  } catch(e) { c.innerHTML='<p style="color:#c0392b;font-size:14px;text-align:center;padding:2rem 0">⚠ Erro ao carregar dashboard.</p>'; }
+}
+
+rP(); rF();
+</script>
+</body>
+</html>
