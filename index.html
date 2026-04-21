@@ -455,13 +455,42 @@ $('btn-import').addEventListener('change', e=>{
       const regs=dados.registros||dados, cols=dados.colaboradores||[];
       if(!Array.isArray(regs)) throw new Error('Formato inválido');
       sbar('<span class="spinner"></span> Importando '+regs.length+' registros...','sload');
-      for(const reg of regs){
-        const {id,obra,data,encarregado,tarefas,obs}=reg;
-        try{ await api('registros',{method:'POST',body:JSON.stringify({id,obra,data,encarregado,tarefas,obs}),headers:{'Prefer':'resolution=ignore-duplicates'}}); }catch(e){}
+
+      // Inserir registros em lote único
+      let regOk=0, regErr=0;
+      const regsLimpos = regs.map(({id,obra,data,encarregado,tarefas,obs})=>({id,obra,data,encarregado,tarefas,obs}));
+      try{
+        await api('registros',{method:'POST', body:JSON.stringify(regsLimpos)});
+        regOk=regsLimpos.length;
+      }catch(e){
+        console.error('Erro ao inserir registros:', e);
+        // tenta um por um
+        for(const reg of regsLimpos){
+          try{ await api('registros',{method:'POST',body:JSON.stringify(reg)}); regOk++; }
+          catch(e2){ console.error('Falhou reg',reg.id, e2.message); regErr++; }
+        }
       }
-      if(cols.length){ try{ await api('colaboradores',{method:'POST',body:JSON.stringify(cols),headers:{'Prefer':'resolution=ignore-duplicates'}}); }catch(e){} }
-      sbar('✓ Importação concluída!','sok');
-    } catch(err){ sbar('⚠ Arquivo inválido: '+err.message,'serr'); }
+
+      // Inserir colaboradores em lotes de 100
+      let colOk=0, colErr=0;
+      const LOTE=100;
+      for(let i=0;i<cols.length;i+=LOTE){
+        const lote=cols.slice(i,i+LOTE);
+        try{
+          await api('colaboradores',{method:'POST',body:JSON.stringify(lote)});
+          colOk+=lote.length;
+        }catch(e){
+          console.error('Erro lote cols',i,e);
+          colErr+=lote.length;
+        }
+      }
+
+      if(regErr>0||colErr>0)
+        sbar(`⚠ Parcial: ${regOk} registros e ${colOk} colaboradores importados. ${regErr+colErr} falharam — veja F12.`,'serr');
+      else
+        sbar(`✓ ${regOk} registros e ${colOk} colaboradores importados!`,'sok');
+
+    } catch(err){ sbar('⚠ Erro: '+err.message,'serr'); console.error(err); }
   };
   r.readAsText(file); e.target.value='';
 });
