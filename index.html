@@ -1176,19 +1176,25 @@ window.salvarDespesa=async function(){
   st.className='sload'; st.textContent='⏳ Salvando...';
   try{
     const despId=Date.now();
-    // Upload foto Drive via form multipart com API key
+    // Upload foto via Edge Function
     let fotoDriveId=null;
     if(despFotoFile){
       st.textContent='⏳ Enviando foto para o Drive...';
+      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(despFotoFile);});
       const ext=despFotoFile.name.split('.').pop()||'jpg';
-      const meta=JSON.stringify({name:`desp_${despId}.${ext}`,parents:[GDRIVE_DESP_FOLDER]});
-      const form=new FormData();
-      form.append('metadata',new Blob([meta],{type:'application/json'}));
-      form.append('file',despFotoFile);
-      const upR=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{
-        method:'POST',headers:{'Authorization':'Bearer '+GDRIVE_KEY},body:form
+      const upResp=await fetch('https://pderpmbmurtagpdsvzjg.supabase.co/functions/v1/drive-upload',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+SBASE_ANON},
+        body:JSON.stringify({
+          fileName:`desp_${despId}.${ext}`,
+          fileBase64:b64,
+          mimeType:despFotoFile.type||'image/jpeg',
+          folderId:GDRIVE_DESP_FOLDER
+        })
       });
-      if(upR.ok){const upD=await upR.json();fotoDriveId=upD.id;}
+      const upData=await upResp.json();
+      if(upData.id) fotoDriveId=upData.id;
+      else console.warn('Drive upload:', upData);
     }
     st.textContent='⏳ Salvando no banco...';
     const SURL='https://pderpmbmurtagpdsvzjg.supabase.co';
