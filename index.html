@@ -254,9 +254,66 @@
   .data-badge { font-size: 12px; color: var(--concreto); font-weight: 400; }
   .hd-info { font-size: 11px; color: var(--concreto); margin-bottom: 10px; letter-spacing: 0.03em; }
   .ambar-text { color: var(--ambar); font-weight: 600; }
+
+  /* ── Login ── */
+  #tela-login {
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--ardosia); padding: 2rem;
+  }
+  #tela-login .login-box {
+    background: var(--white); border-radius: 12px;
+    padding: 2.5rem 2rem; width: 100%; max-width: 340px;
+    text-align: center;
+  }
+  #tela-login .login-marca {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 500;
+    color: var(--ardosia); letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  #tela-login .login-sub {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--ambar); margin-bottom: 2rem;
+  }
+  #tela-login .login-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--concreto); margin-bottom: 1.5rem;
+  }
+  #tela-login input {
+    width: 100%; margin-bottom: 12px; text-align: center;
+    font-size: 14px; padding: 10px;
+  }
+  #tela-login .btn-login {
+    width: 100%; background: var(--ardosia); color: var(--white);
+    border: none; border-radius: 4px; padding: 12px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; cursor: pointer; margin-top: 4px;
+    font-family: 'Montserrat', sans-serif;
+  }
+  #tela-login .btn-login:hover { background: var(--asfalto); }
+  #tela-login .login-erro {
+    font-size: 12px; color: #c0392b; margin-top: 12px; display: none;
+  }
+  #app { display: none; }
 </style>
 </head>
 <body>
+
+<!-- Tela de Login -->
+<div id="tela-login">
+  <div class="login-box">
+    <div class="login-marca">ÁGORA</div>
+    <div class="login-sub">Construtora</div>
+    <div class="login-title">Diário de Obras</div>
+    <input type="text" id="login-user" placeholder="Usuário" autocomplete="off" />
+    <input type="password" id="login-senha" placeholder="Senha" autocomplete="off" />
+    <button class="btn-login" id="btn-login">Entrar</button>
+    <div class="login-erro" id="login-erro">Usuário ou senha incorretos.</div>
+  </div>
+</div>
+
+<div id="app">
 
 <!-- Header -->
 <div class="header">
@@ -363,8 +420,66 @@
   <div id="v-dash" style="display:none"><div id="dash-cont"></div></div>
 
 </div><!-- /container -->
+</div><!-- /app -->
 
 <script>
+// ── Usuários ─────────────────────────────────────────────────
+const USUARIOS = {
+  'leandro': 'download1',
+  'wiliam':  'wiliam123'
+};
+
+// Usa variável em memória — perde ao atualizar a página
+let usuarioLogado = null;
+let timerInatividade = null;
+const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
+
+function resetarTimer(){
+  clearTimeout(timerInatividade);
+  timerInatividade = setTimeout(()=>{
+    usuarioLogado = null;
+    document.getElementById('app').style.display='none';
+    document.getElementById('tela-login').style.display='flex';
+    document.getElementById('login-user').value='';
+    document.getElementById('login-senha').value='';
+    document.getElementById('login-user').focus();
+    alert('Sessão encerrada por inatividade. Faça login novamente.');
+  }, TIMEOUT_MS);
+}
+
+// Reseta timer em qualquer interação
+['click','keydown','mousemove','touchstart'].forEach(ev=>{
+  document.addEventListener(ev, resetarTimer, {passive:true});
+});
+
+document.getElementById('btn-login').addEventListener('click', fazerLogin);
+document.getElementById('login-senha').addEventListener('keydown', e=>{ if(e.key==='Enter') fazerLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('login-senha').focus(); });
+
+function fazerLogin(){
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  const senha = document.getElementById('login-senha').value;
+  const erro = document.getElementById('login-erro');
+  if(USUARIOS[user] && USUARIOS[user]===senha){
+    usuarioLogado = user;
+    erro.style.display='none';
+    document.getElementById('tela-login').style.display='none';
+    document.getElementById('app').style.display='block';
+    const encEl = document.getElementById('encarregado');
+    if(encEl && !encEl.value) encEl.value = user.charAt(0).toUpperCase()+user.slice(1);
+    resetarTimer();
+    iniciarApp();
+  } else {
+    erro.style.display='block';
+    document.getElementById('login-senha').value='';
+    document.getElementById('login-senha').focus();
+  }
+}
+
+// Nunca auto-inicia — sempre pede login
+
+function iniciarApp(){
+
 const SUPABASE_URL = 'https://pderpmbmurtagpdsvzjg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
 const BUCKET = 'fotos-obras';
@@ -728,6 +843,8 @@ async function rD(){
 }
 
 rP(); rF();
+
+} // fim iniciarApp
 </script>
 </body>
 </html>
