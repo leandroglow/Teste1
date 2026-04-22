@@ -760,17 +760,19 @@ const OBRAS=['Casa do Lago AC20','Evidencias K21','Salto M14','Chácara Lobo Gua
 const USUARIOS={'leandro':'download1','wiliam':'wiliam123'};
 
 // ── Google Drive ─────────────────────────────────────────
-const GDRIVE_KEY='AIzaSyBUoEB4qeeIl0dTLDg6AbS-gQL6sTNf__Q';
 const SBASE_ANON='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
 const SBASE_URL='https://pderpmbmurtagpdsvzjg.supabase.co';
+const DRIVE_LIST_PROXY='https://pderpmbmurtagpdsvzjg.supabase.co/functions/v1/drive-list';
 
 // Pastas padrão — sobrescritas pelo JSON importado ou pelo Supabase
 let GDRIVE_PASTAS={
-  'Chácara Lobo Guará':{
-    renders:'1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
-    projeto:'1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
-    fotos:  '1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
-  },
+  'Casa do Lago AC20':   { renders:'COLE_O_ID_DA_PASTA_RENDERS_AQUI', projeto:'1V4OFVDJGwbuXoG6OJCmyKgBLcS8GYaGU', fotos:'COLE_O_ID_DA_PASTA_FOTOS_AQUI' },
+  'Evidencias K21':      { renders:'10l4tW0XMZcGGsovmuQZsNbSdtSzQ5X9J', projeto:'1Hi_x-so_b6JMQKa7otE8YUVSahMZy_4S', fotos:'COLE_O_ID_DA_PASTA_FOTOS_AQUI' },
+  'Salto M14':           { renders:'COLE_O_ID_DA_PASTA_RENDERS_AQUI', projeto:'1hVtKwgDmk5X0RAKQQSZZsaRHWqtbVjMr', fotos:'COLE_O_ID_DA_PASTA_FOTOS_AQUI' },
+  'Chácara Lobo Guará':  { renders:'COLE_O_ID_DA_PASTA_RENDERS_AQUI', projeto:'1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1', fotos:'1J2hzWg9M73eRVqp9H-dO5Skj2ltgaA4g' },
+  'Milano P4':           { renders:'14siYCecvpdAYXZcxdQmuHLfUIX2ARtqM', projeto:'1rky7vne2oYsx959cdKSVARSIP2RxuqK6', fotos:'COLE_O_ID_DA_PASTA_FOTOS_AQUI' },
+  'Milano P3':           { renders:'COLE_O_ID_DA_PASTA_RENDERS_AQUI', projeto:'1wGzsZxilEWAWoMOO_UvzBVUwfbILSBT9', fotos:'COLE_O_ID_DA_PASTA_FOTOS_AQUI' },
+  'Di Roma E6':          { renders:'COLE_O_ID_DA_PASTA_RENDERS_AQUI', projeto:'1Dm30kjvw2Y4VxGklDcGQf_WZm3r8oJHx', fotos:'COLE_O_ID_DA_PASTA_FOTOS_AQUI' },
 };
 
 // Carrega config do Supabase ao iniciar
@@ -782,7 +784,7 @@ window.carregarConfigDrive = async function(){
     const rows=await res.json();
     if(rows&&rows.length&&rows[0].valor){
       GDRIVE_PASTAS=rows[0].valor;
-      renderListaObras(); // atualiza status das obras
+      renderListaObras();
     }
   }catch(e){ console.warn('Config Drive não carregada:', e.message); }
 }
@@ -790,28 +792,24 @@ window.carregarConfigDrive = async function(){
 window.salvarConfigDriveSupabase = async function(){
   const H={'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
   const r=await fetch(SBASE_URL+'/rest/v1/configuracoes',{
-    method:'POST',
-    headers:H,
+    method:'POST',headers:H,
     body:JSON.stringify({chave:'gdrive_pastas',valor:GDRIVE_PASTAS,atualizado_em:new Date().toISOString()})
   });
   if(!r.ok){
     const err=await r.text();
-    // Se der erro de RLS, tenta via upsert com patch
-    if(err.includes('row-level security')){
-      console.warn('RLS bloqueou insert — tente rodar no SQL Editor: create policy "allow all" on configuracoes for all using (true) with check (true);');
-      throw new Error('Permissão negada. Rode a policy de RLS no Supabase SQL Editor.');
-    }
+    if(err.includes('row-level security')) throw new Error('Permissão negada. Rode a policy de RLS no Supabase SQL Editor.');
     throw new Error(err);
   }
 }
 
 async function gdriveListar(folderId, mime=''){
-  let q=`'${folderId}' in parents and trashed=false`;
-  if(mime) q+=` and mimeType='${mime}'`;
-  const url=`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&key=${GDRIVE_KEY}&pageSize=100&orderBy=name`;
+  let url=DRIVE_LIST_PROXY+'?folder='+encodeURIComponent(folderId);
+  if(mime) url+='&mime='+encodeURIComponent(mime);
   const res=await fetch(url);
   if(!res.ok) throw new Error('Drive API: '+res.status);
-  return (await res.json()).files||[];
+  const data=await res.json();
+  if(data&&data.error) throw new Error(typeof data.error==='string'?data.error:JSON.stringify(data.error));
+  return Array.isArray(data)?data:[];
 }
 function gdriveSubpastas(id){ return gdriveListar(id,'application/vnd.google-apps.folder'); }
 async function gdriveImagens(id){
@@ -820,16 +818,15 @@ async function gdriveImagens(id){
 }
 function gdrivePdfs(id){ return gdriveListar(id,'application/pdf'); }
 
-// Busca TODAS as imagens: soltas + dentro de subpastas (1 nível)
 async function gdriveTodasImagens(folderId){
-  const [soltas, subs] = await Promise.all([gdriveImagens(folderId), gdriveSubpastas(folderId)]);
-  const deSubpastas = await Promise.all(subs.map(s=>gdriveImagens(s.id)));
-  return [...soltas, ...deSubpastas.flat()];
+  const [soltas, subs]=await Promise.all([gdriveImagens(folderId),gdriveSubpastas(folderId)]);
+  const deSubpastas=await Promise.all(subs.map(s=>gdriveImagens(s.id)));
+  return [...soltas,...deSubpastas.flat()];
 }
 
-// Thumbnail e URL de visualização
-const gdThumb = (id,sz='w400')=>`https://drive.google.com/thumbnail?id=${id}&sz=${sz}`;
-const gdView  = (id)=>`https://drive.google.com/thumbnail?id=${id}&sz=w1600`;
+// URLs via proxy autenticado
+const gdThumb = (id)=> driveImgUrl(id);
+const gdView  = (id)=> driveImgUrl(id);
 
 let usuarioLogado=null,timerInatividade=null,appIniciado=false;
 const TIMEOUT_MS=5*60*1000;
@@ -1416,7 +1413,7 @@ window.verFotoDesp=async function(driveId){
   // Cria uma Edge Function de acesso à foto autenticada
   // Usa URL de exportação do Drive que funciona com compartilhamento público
   const url=`https://drive.google.com/uc?export=view&id=${driveId}`;
-  const thumb=`https://drive.google.com/thumbnail?id=${driveId}&sz=w400`;
+  const thumb=driveImgUrl(driveId);
   window.lbAbrir([{id:driveId,name:'Foto da despesa',url,thumb}],0,'foto');
 };
 
@@ -2030,7 +2027,7 @@ function drivePdfUrl(id){ return DRIVE_IMG_PROXY+'?id='+id+'&pdf=1'; }
     thumbs.innerHTML=items.map((it,i)=>{
       const src=tipo==='foto'
         ?(it.id?driveImgUrl(it.id):(it.thumb||it.url))
-        :(it.id?'https://drive.google.com/thumbnail?id='+it.id+'&sz=w120':'');
+        :(it.id?driveImgUrl(it.id):'');
       return '<div class="lb-thumb'+(i===cur?' active':'')+'" data-i="'+i+'"><img src="'+src+'" loading="lazy" onerror="this.parentElement.innerHTML=\'<div class=lb-thumb-pdf>\u{1F4C4}</div>\'" /></div>';
     }).join('');
     thumbs.querySelectorAll('.lb-thumb').forEach(t=>{
