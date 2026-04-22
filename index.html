@@ -220,7 +220,7 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 .proj-obra-inner{display:none;padding:1.25rem 1rem;max-width:720px;margin:0 auto}
 .proj-inner-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ardosia);margin-bottom:4px}
 .proj-inner-sub{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--concreto);margin-bottom:1.5rem}
-.proj-sub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.proj-sub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .proj-sub-btn{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:24px 12px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .proj-sub-btn:hover{border-color:var(--ambar);box-shadow:0 2px 12px rgba(212,136,10,.12)}
 .proj-sub-icon{width:44px;height:44px;border-radius:10px;background:var(--argamassa);border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
@@ -309,10 +309,17 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 #lb-wm-canvas{position:absolute;top:0;left:0;pointer-events:none;display:none}
 
 /* PDF — iframe com scroll próprio */
-#lb-pdf-wrap{display:none;width:100%;height:100%;align-items:stretch;justify-content:center}
-#lb-pdf-wrap.active{display:flex}
-#lb-pdf-inner{position:relative;width:min(960px,99vw);height:100%;display:flex;flex-direction:column}
-#lb-pdf-frame{flex:1;width:100%;border:none;background:#fff}
+#lb-pdf-wrap{display:none;width:100%;height:100%;overflow-y:auto;overflow-x:auto;background:#525659;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.3) transparent}
+#lb-pdf-wrap.active{display:block}
+#lb-pdf-wrap::-webkit-scrollbar{width:6px;height:6px}
+#lb-pdf-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.3);border-radius:3px}
+#lb-pdf-pages{display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;min-height:100%}
+.pdf-page-wrap{position:relative;box-shadow:0 4px 20px rgba(0,0,0,.5);line-height:0}
+.pdf-page-wrap canvas{display:block}
+.pdf-page-wm{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:10px 0}
+.pdf-wm-text{font-family:'Cormorant Garamond',serif;font-size:clamp(12px,2vw,22px);font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;transform:rotate(-30deg);user-select:none}
+.pdf-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:rgba(255,255,255,.6);font-family:'Montserrat',sans-serif;font-size:13px}
 #lb-pdf-wm{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:20px 0}
 .lb-pdf-wm-text{font-family:'Cormorant Garamond',serif;font-size:clamp(13px,1.8vw,20px);font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;transform:rotate(-30deg);user-select:none;color:rgba(80,95,110,.45);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 
@@ -603,6 +610,13 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
           </div>
           <span class="proj-sub-label">Fotos</span>
           <span class="proj-sub-desc">Registro fotográfico</span>
+        </div>
+        <div class="proj-sub-btn" id="btn-cat-info" onclick="abrirInfoObra()">
+          <div class="proj-sub-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ardosia)" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <span class="proj-sub-label">Informações</span>
+          <span class="proj-sub-desc">Dados para o assistente</span>
         </div>
       </div>
       <!-- Conteúdo da categoria (imagens, subpastas, PDFs) -->
@@ -940,12 +954,69 @@ window.abrirObra=function(obra){
   document.getElementById('proj-inner-nome').textContent=obra;
   document.getElementById('header-secao-titulo').textContent=obra;
   document.getElementById('proj-cat-conteudo').innerHTML='';
-  // Remove destaque dos botões
-  ['renders','projeto','fotos'].forEach(c=>{
+  ['renders','projeto','fotos','info'].forEach(c=>{
     const b=document.getElementById('btn-cat-'+c);
     if(b) b.style.borderColor='';
   });
   projMostrar(2);
+};
+
+window.abrirInfoObra=async function(){
+  const cont=document.getElementById('proj-cat-conteudo');
+  ['renders','projeto','fotos','info'].forEach(c=>{
+    const b=document.getElementById('btn-cat-'+c);
+    if(b) b.style.borderColor= c==='info'?'var(--ambar)':'';
+  });
+  cont.innerHTML=`<div class="proj-cat-title">Informações para o Assistente</div>
+    <div class="proj-empty"><div class="big-spinner"></div><p>Carregando...</p></div>`;
+  try{
+    const res=await fetch(SBASE_URL+'/rest/v1/projetos_info?obra=eq.'+encodeURIComponent(obraAtual)+'&select=conteudo',{
+      headers:{'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON}
+    });
+    const rows=await res.json();
+    const conteudo=(rows&&rows.length)?rows[0].conteudo:'';
+    cont.innerHTML=`<div class="proj-cat-title">Informações para o Assistente</div>
+      <p class="hint" style="margin-bottom:12px">Estas informações são usadas pelo assistente para responder sobre esta obra. Use o modelo .md fornecido como guia.</p>
+      <textarea id="proj-info-txt" rows="16" style="resize:vertical;font-family:monospace;font-size:12px;line-height:1.6">${conteudo.replace(/</g,'&lt;')}</textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px">
+        <label class="btn-secondary" style="cursor:pointer;padding:10px 20px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--border-strong);border-radius:4px">
+          📎 Importar .md
+          <input type="file" accept=".md,.txt" style="display:none" onchange="importarMdObra(this)">
+        </label>
+        <button class="btn-primary" onclick="salvarInfoObra()">💾 Salvar</button>
+      </div>
+      <div id="proj-info-status" style="margin-top:8px;font-size:12px;text-align:right"></div>`;
+  }catch(e){
+    cont.innerHTML=`<div class="proj-empty"><div class="proj-empty-icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+};
+
+window.importarMdObra=function(input){
+  const file=input.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{document.getElementById('proj-info-txt').value=ev.target.result;};
+  r.readAsText(file); input.value='';
+};
+
+window.salvarInfoObra=async function(){
+  const conteudo=document.getElementById('proj-info-txt').value.trim();
+  const statusEl=document.getElementById('proj-info-status');
+  statusEl.textContent='Salvando...'; statusEl.style.color='var(--ambar)';
+  try{
+    const H={'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
+    const r=await fetch(SBASE_URL+'/rest/v1/projetos_info',{
+      method:'POST',headers:H,
+      body:JSON.stringify({obra:obraAtual,conteudo,atualizado_em:new Date().toISOString()})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    statusEl.textContent='✓ Salvo! O assistente já pode usar estas informações.';
+    statusEl.style.color='#2d6a4f';
+    // Atualiza contexto do chat
+    if(typeof carregarContextoProjetos==='function') carregarContextoProjetos();
+  }catch(e){
+    statusEl.textContent='⚠ Erro: '+e.message;
+    statusEl.style.color='#a93226';
+  }
 };
 
 window.abrirCategoria=async function(cat){
@@ -953,7 +1024,7 @@ window.abrirCategoria=async function(cat){
   const cont=document.getElementById('proj-cat-conteudo');
 
   // Destaca botão ativo
-  ['renders','projeto','fotos'].forEach(c=>{
+  ['renders','projeto','fotos','info'].forEach(c=>{
     const b=document.getElementById('btn-cat-'+c);
     if(b) b.style.borderColor = c===cat ? 'var(--ambar)' : '';
   });
@@ -1383,7 +1454,19 @@ window.salvarEdicaoDesp=async function(id){
 };
 
 // ── ASSISTENTE ───────────────────────────────────────────
-let chatIniciado=false, chatHistorico=[];
+let chatIniciado=false, chatHistorico=[], chatContextoProjetos='';
+
+async function carregarContextoProjetos(){
+  try{
+    const res=await fetch(SBASE_URL+'/rest/v1/projetos_info?select=obra,conteudo',{
+      headers:{'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON}
+    });
+    const rows=await res.json();
+    if(rows&&rows.length){
+      chatContextoProjetos=rows.map(r=>`## ${r.obra}\n${r.conteudo}`).join('\n\n---\n\n');
+    }
+  }catch(e){ console.warn('Contexto projetos:', e.message); }
+}
 
 function iniciarChat(){
   chatIniciado=true; chatHistorico=[];
@@ -1393,6 +1476,7 @@ function iniciarChat(){
   const inp=document.getElementById('chat-input');
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();chatEnviar();}});
   inp.addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,100)+'px';});
+  carregarContextoProjetos();
 }
 
 function chatMsg(role,texto){
@@ -1412,17 +1496,16 @@ window.chatEnviar=async function(){
   document.getElementById('chat-send').disabled=true;
   chatMsg('user',txt);
   chatHistorico.push({role:'user',content:txt});
-  // Typing indicator
   const msgs=document.getElementById('chat-msgs');
   const typing=document.createElement('div');
   typing.className='chat-msg chat-msg-ai'; typing.id='chat-typing';
   typing.innerHTML=`<div class="chat-avatar">Á</div><div class="chat-bubble chat-typing"><div class="chat-dot"></div><div class="chat-dot"></div><div class="chat-dot"></div></div>`;
   msgs.appendChild(typing); msgs.scrollTop=msgs.scrollHeight;
   try{
-    const resposta=await openaiChat([
-      {role:'system',content:'Você é um assistente especializado em construção civil para a Ágora Construtora. Responda em português brasileiro de forma clara e prática. Foque em construção, materiais, normas ABNT, gestão de obras e temas relacionados.'},
-      ...chatHistorico
-    ]);
+    const systemPrompt=chatContextoProjetos
+      ?`Você é um assistente especializado em construção civil para a Ágora Construtora. Responda em português brasileiro de forma clara e prática. Foque em construção, materiais, normas ABNT, gestão de obras e temas relacionados.\n\nInformações dos projetos em andamento:\n\n${chatContextoProjetos}\n\nUse essas informações quando perguntado sobre obras específicas.`
+      :'Você é um assistente especializado em construção civil para a Ágora Construtora. Responda em português brasileiro de forma clara e prática. Foque em construção, materiais, normas ABNT, gestão de obras e temas relacionados.';
+    const resposta=await openaiChat([{role:'system',content:systemPrompt},...chatHistorico]);
     chatHistorico.push({role:'assistant',content:resposta});
     if(chatHistorico.length>20) chatHistorico=chatHistorico.slice(-20);
     document.getElementById('chat-typing')?.remove();
@@ -1698,6 +1781,12 @@ function renderRelatorio(registros){
 </script>
 
 <!-- ══ LIGHTBOX ══ -->
+<!-- PDF.js library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+</script>
+
 <div id="lightbox">
   <div class="lb-header">
     <div class="lb-titulo" id="lb-titulo"></div>
@@ -1711,20 +1800,12 @@ function renderRelatorio(registros){
     <div id="lb-foto-wrap">
       <div id="lb-img-container">
         <img id="lb-img" src="" alt="" crossorigin="anonymous" />
-        <!-- Watermark desenhado via canvas sobreposto -->
         <canvas id="lb-wm-canvas"></canvas>
       </div>
     </div>
-    <!-- PDF -->
+    <!-- PDF via PDF.js -->
     <div id="lb-pdf-wrap">
-      <div id="lb-pdf-inner">
-        <iframe id="lb-pdf-frame" src="" allowfullscreen></iframe>
-        <div id="lb-pdf-wm">
-          <span class="lb-pdf-wm-text">Ágora Construtora</span>
-          <span class="lb-pdf-wm-text">Ágora Construtora</span>
-          <span class="lb-pdf-wm-text">Ágora Construtora</span>
-        </div>
-      </div>
+      <div id="lb-pdf-pages"></div>
     </div>
     <div class="lb-nav prev disabled" id="lb-prev">‹</div>
     <div class="lb-nav next disabled" id="lb-next">›</div>
@@ -1742,49 +1823,54 @@ function renderRelatorio(registros){
   <div class="lb-thumbs" id="lb-thumbs"></div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const DRIVE_IMG_PROXY='https://pderpmbmurtagpdsvzjg.supabase.co/functions/v1/drive-image';
+function driveImgUrl(id){ return DRIVE_IMG_PROXY+'?id='+id; }
+function drivePdfUrl(id){ return DRIVE_IMG_PROXY+'?id='+id+'&pdf=1'; }
+
 (function(){
-  let items=[], cur=0, tipo='foto', zoom=1;
+  let items=[], cur=0, tipo='foto', zoom=1, pdfDoc=null;
   const STEP=0.25, MAX=8, MIN=0.25;
-  const WM_TEXT='Ágora Construtora';
+  const WM='Agora Construtora';
 
-  const lb     = document.getElementById('lightbox');
-  const fWrap  = document.getElementById('lb-foto-wrap');
-  const pWrap  = document.getElementById('lb-pdf-wrap');
-  const img    = document.getElementById('lb-img');
-  const imgCon = document.getElementById('lb-img-container');
-  const wmCvs  = document.getElementById('lb-wm-canvas');
-  const frame  = document.getElementById('lb-pdf-frame');
-  const titulo = document.getElementById('lb-titulo');
-  const contEl = document.getElementById('lb-contador');
-  const thumbs = document.getElementById('lb-thumbs');
-  const ctrlBar= document.getElementById('lb-ctrl-bar');
-  const zlbl   = document.getElementById('lb-zoom-label');
-  const prev   = document.getElementById('lb-prev');
-  const next   = document.getElementById('lb-next');
+  const lb=document.getElementById('lightbox');
+  const fWrap=document.getElementById('lb-foto-wrap');
+  const pWrap=document.getElementById('lb-pdf-wrap');
+  const pPages=document.getElementById('lb-pdf-pages');
+  const img=document.getElementById('lb-img');
+  const imgCon=document.getElementById('lb-img-container');
+  const wmCvs=document.getElementById('lb-wm-canvas');
+  const titulo=document.getElementById('lb-titulo');
+  const contEl=document.getElementById('lb-contador');
+  const thumbs=document.getElementById('lb-thumbs');
+  const ctrlBar=document.getElementById('lb-ctrl-bar');
+  const zlbl=document.getElementById('lb-zoom-label');
+  const prev=document.getElementById('lb-prev');
+  const next=document.getElementById('lb-next');
+  const metaVP=document.querySelector('meta[name=viewport]');
 
-  // Bloqueia zoom da página quando lightbox está aberto
-  const metaVP = document.querySelector('meta[name=viewport]');
-  function lockPageZoom(){ metaVP.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'; }
-  function unlockPageZoom(){ metaVP.content='width=device-width,initial-scale=1.0'; }
+  function lockVP(){metaVP.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no';}
+  function unlockVP(){metaVP.content='width=device-width,initial-scale=1.0,maximum-scale=1.0';}
 
   window.lbAbrir=function(arr,start,t){
-    items=arr; cur=start; tipo=t||'foto'; zoom=1;
+    items=arr; cur=start; tipo=t||'foto'; zoom=1; pdfDoc=null;
     lb.classList.add('open');
     document.body.style.overflow='hidden';
-    lockPageZoom();
-    buildThumbs(); show();
+    lockVP(); buildThumbs(); show();
   };
 
   function fechar(){
     lb.classList.remove('open');
     document.body.style.overflow='';
-    unlockPageZoom();
-    frame.src=''; img.src='';
+    unlockVP();
+    img.src=''; pdfDoc=null; pPages.innerHTML='';
     if(wmCvs.width) wmCvs.getContext('2d').clearRect(0,0,wmCvs.width,wmCvs.height);
   }
   document.getElementById('lb-fechar').onclick=fechar;
-  lb.addEventListener('click',e=>{ if(e.target===lb) fechar(); });
+  lb.addEventListener('click',e=>{if(e.target===lb)fechar();});
 
   function show(){
     const it=items[cur];
@@ -1793,198 +1879,194 @@ function renderRelatorio(registros){
     prev.classList.toggle('disabled',cur===0);
     next.classList.toggle('disabled',cur===items.length-1);
     syncThumbActive();
-
     if(tipo==='foto'){
       fWrap.classList.add('active'); pWrap.classList.remove('active');
       ctrlBar.style.display='flex';
-      zoom=1;
-      wmCvs.style.display='none';
-      img.style.transform='';
+      zoom=1; wmCvs.style.display='none';
       img.style.width=''; img.style.height='';
       img.style.maxWidth='90vw'; img.style.maxHeight='78vh';
-      img.onload=()=>{ applyZoom(); drawWatermark(); };
-      img.src=it.url;
+      const src=it.id ? driveImgUrl(it.id) : (it.url||it.thumb||'');
+      img.onload=()=>{applyZoom();drawWM();};
+      img.onerror=()=>{if(it.url&&img.src!==it.url)img.src=it.url;};
+      img.src=src;
     } else {
       pWrap.classList.add('active'); fWrap.classList.remove('active');
-      // PDF: usa viewer nativo do Drive que já tem zoom de alta qualidade
-      // Removemos nossa barra de zoom para não distorcer
-      ctrlBar.style.display='none';
-      // Usa o viewer com toolbar completa do Drive
-      frame.src=`https://drive.google.com/file/d/${it.id}/preview?rm=minimal`;
+      ctrlBar.style.display='flex';
+      zoom=1; zlbl.textContent='100%';
+      renderPdf(it.id);
     }
   }
 
-  // ── Watermark ────────────────────────────────────────────
-  function drawWatermark(){
-    if(!img.naturalWidth||!img.offsetWidth) return;
-    const w=img.offsetWidth, h=img.offsetHeight;
-    const offscreen=document.createElement('canvas');
-    const sw=Math.min(img.naturalWidth,200), sh=Math.min(img.naturalHeight,200);
-    offscreen.width=sw; offscreen.height=sh;
-    const ctx2=offscreen.getContext('2d');
+  async function renderPdf(fileId){
+    pPages.innerHTML='<div class="pdf-loading"><div class="big-spinner"></div><p>Carregando PDF...</p></div>';
     try{
-      ctx2.drawImage(img,0,0,sw,sh);
-      const d=ctx2.getImageData(0,0,sw,sh).data;
-      let lum=0;
-      for(let i=0;i<d.length;i+=4) lum+=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000;
-      lum/=(d.length/4);
-      paintWM(w,h, lum>160?'rgba(40,50,60,0.35)':'rgba(255,255,255,0.35)', lum>160?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.4)');
+      const resp=await fetch(drivePdfUrl(fileId));
+      if(!resp.ok) throw new Error('Erro '+resp.status);
+      const buf=await resp.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      pdfDoc=pdf; pPages.innerHTML='';
+      for(let p=1;p<=pdf.numPages;p++) await renderPage(pdf,p,zoom);
     }catch(e){
-      paintWM(w,h,'rgba(255,255,255,0.3)','rgba(0,0,0,0.35)');
+      pPages.innerHTML='<div class="pdf-loading"><p style="color:#f87171">Erro ao carregar: '+e.message+'</p></div>';
     }
   }
-  function paintWM(w,h,color,shadow){
-    wmCvs.width=w; wmCvs.height=h;
-    wmCvs.style.width=w+'px'; wmCvs.style.height=h+'px';
-    wmCvs.style.display='block';
-    const ctx=wmCvs.getContext('2d');
-    ctx.clearRect(0,0,w,h);
-    ctx.save();
-    ctx.translate(w/2,h/2);
-    ctx.rotate(-30*Math.PI/180);
-    const fs=Math.max(14,Math.min(w,h)*0.055);
-    ctx.font=`600 ${fs}px 'Cormorant Garamond',serif`;
-    ctx.fillStyle=color; ctx.shadowColor=shadow; ctx.shadowBlur=4;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    const gapX=Math.max(180,w*0.45), gapY=Math.max(80,h*0.22);
-    for(let y=-h;y<h;y+=gapY) for(let x=-w;x<w;x+=gapX) ctx.fillText(WM_TEXT,x,y);
-    ctx.restore();
+
+  async function renderPage(pdf,pageNum,z){
+    const page=await pdf.getPage(pageNum);
+    const bScale=Math.min((pWrap.clientWidth||800)-40,900)/page.getViewport({scale:1}).width;
+    const vp=page.getViewport({scale:bScale*(z||1)});
+    const wrap=document.createElement('div'); wrap.className='pdf-page-wrap';
+    const canvas=document.createElement('canvas');
+    canvas.width=vp.width; canvas.height=vp.height;
+    canvas.style.width=vp.width+'px'; canvas.style.height=vp.height+'px';
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    addPdfWM(canvas);
+    wrap.appendChild(canvas); pPages.appendChild(wrap);
   }
 
-  // ── Zoom (scroll-based, não transform da página) ─────────
+  function addPdfWM(canvas){
+    const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+    try{
+      const d=ctx.getImageData(0,0,Math.min(w,50),Math.min(h,50)).data;
+      let lum=0; for(let i=0;i<d.length;i+=4) lum+=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000;
+      lum/=(d.length/4);
+      ctx.save(); ctx.translate(w/2,h/2); ctx.rotate(-30*Math.PI/180);
+      const fs=Math.max(12,Math.min(w,h)*0.04);
+      ctx.font='600 '+fs+'px serif';
+      ctx.fillStyle=lum>160?'rgba(40,50,60,0.25)':'rgba(255,255,255,0.25)';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      const gx=Math.max(160,w*0.4),gy=Math.max(70,h*0.18);
+      for(let y=-h;y<h;y+=gy) for(let x=-w;x<w;x+=gx) ctx.fillText(WM,x,y);
+      ctx.restore();
+    }catch(e){}
+  }
+
+  async function reRenderPdf(){
+    if(!pdfDoc)return;
+    pPages.innerHTML='<div class="pdf-loading"><div class="big-spinner"></div><p>Aplicando zoom...</p></div>';
+    for(let p=1;p<=pdfDoc.numPages;p++) await renderPage(pdfDoc,p,zoom);
+  }
+
   function applyZoom(){
     zlbl.textContent=Math.round(zoom*100)+'%';
-    if(tipo==='pdf'){
-      const fr=document.getElementById('lb-pdf-frame');
-      const pInner=document.getElementById('lb-pdf-inner');
-      // Escala o iframe e ajusta o container para scroll funcionar
-      fr.style.transform=`scale(${zoom})`;
-      fr.style.transformOrigin='top center';
-      fr.style.width='100%';
-      fr.style.height=`${100/zoom}%`;
-      pInner.style.overflow= zoom>1 ? 'auto' : 'hidden';
-      pInner.style.height='100%';
-      imgCon.classList.remove('zoomed');
-      return;
-    }
-    if(!img.naturalWidth) return;
-    const nw=img.naturalWidth, nh=img.naturalHeight;
-    const baseW=Math.min(nw, window.innerWidth*0.9);
-    const baseH=Math.min(nh, (window.innerHeight-200)*0.9);
-    const scale=Math.min(baseW/nw, baseH/nh);
-    const newW=Math.round(nw*scale*zoom);
-    const newH=Math.round(nh*scale*zoom);
+    if(tipo==='pdf'){reRenderPdf();return;}
+    if(!img.naturalWidth)return;
+    const nw=img.naturalWidth,nh=img.naturalHeight;
+    const s=Math.min(Math.min(nw,window.innerWidth*0.9)/nw, Math.min(nh,(window.innerHeight-200)*0.9)/nh);
+    const newW=Math.round(nw*s*zoom),newH=Math.round(nh*s*zoom);
     img.style.maxWidth='none'; img.style.maxHeight='none';
     img.style.width=newW+'px'; img.style.height=newH+'px';
     img.style.transform='';
     wmCvs.style.width=newW+'px'; wmCvs.style.height=newH+'px';
     wmCvs.width=newW; wmCvs.height=newH;
     imgCon.classList.toggle('zoomed',zoom>1);
-    const fw=fWrap.clientWidth, fh=fWrap.clientHeight;
-    imgCon.style.marginLeft = newW<fw ? Math.round((fw-newW)/2)+'px' : '8px';
-    imgCon.style.marginTop  = newH<fh ? Math.round((fh-newH)/2)+'px' : '8px';
+    const fw=fWrap.clientWidth,fh=fWrap.clientHeight;
+    imgCon.style.marginLeft=newW<fw?Math.round((fw-newW)/2)+'px':'8px';
+    imgCon.style.marginTop=newH<fh?Math.round((fh-newH)/2)+'px':'8px';
     imgCon.style.marginRight='8px'; imgCon.style.marginBottom='8px';
-    drawWatermark();
+    drawWM();
   }
-  function zoomIn() { zoom=Math.min(+(zoom+STEP).toFixed(2),MAX); applyZoom(); }
-  function zoomOut(){ zoom=Math.max(+(zoom-STEP).toFixed(2),MIN); applyZoom(); }
-  function setZoom(v){ zoom=v; applyZoom(); }
+  function zoomIn(){zoom=Math.min(+(zoom+STEP).toFixed(2),MAX);applyZoom();}
+  function zoomOut(){zoom=Math.max(+(zoom-STEP).toFixed(2),MIN);applyZoom();}
+  function setZoom(v){zoom=v;applyZoom();}
 
-  document.getElementById('lb-zoom-in').onclick  = zoomIn;
-  document.getElementById('lb-zoom-out').onclick  = zoomOut;
-  document.getElementById('lb-zoom-50').onclick   = ()=>setZoom(.5);
-  document.getElementById('lb-zoom-100').onclick  = ()=>setZoom(1);
-  document.getElementById('lb-zoom-200').onclick  = ()=>setZoom(2);
-  document.querySelector('.lb-zoom-reset').onclick = ()=>setZoom(1);
-
-  // Scroll do mouse = zoom (só no wrap da foto)
-  fWrap.addEventListener('wheel',e=>{
-    e.preventDefault();
-    e.deltaY<0?zoomIn():zoomOut();
-  },{passive:false});
-
-  imgCon.onclick=e=>{
-    if(e.target===wmCvs||e.target===img){ zoom===1?setZoom(2):setZoom(1); }
-  };
-
-  // Pinch mobile
+  document.getElementById('lb-zoom-in').onclick=zoomIn;
+  document.getElementById('lb-zoom-out').onclick=zoomOut;
+  document.getElementById('lb-zoom-50').onclick=()=>setZoom(.5);
+  document.getElementById('lb-zoom-100').onclick=()=>setZoom(1);
+  document.getElementById('lb-zoom-200').onclick=()=>setZoom(2);
+  document.querySelector('.lb-zoom-reset').onclick=()=>setZoom(1);
+  fWrap.addEventListener('wheel',e=>{e.preventDefault();e.deltaY<0?zoomIn():zoomOut();},{passive:false});
+  imgCon.onclick=e=>{if(e.target===wmCvs||e.target===img){zoom===1?setZoom(2):setZoom(1);}};
   let d0=0;
-  lb.addEventListener('touchstart',e=>{
-    if(e.touches.length===2) d0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-  },{passive:true});
-  lb.addEventListener('touchmove',e=>{
-    if(e.touches.length===2){
-      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-      if(Math.abs(d-d0)>6){ d>d0?zoomIn():zoomOut(); d0=d; }
-    }
-  },{passive:true});
+  lb.addEventListener('touchstart',e=>{if(e.touches.length===2)d0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);},{passive:true});
+  lb.addEventListener('touchmove',e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(Math.abs(d-d0)>6){d>d0?zoomIn():zoomOut();d0=d;}}},{passive:true});
 
-  // ── Navegação ────────────────────────────────────────────
-  prev.onclick=()=>{ if(cur>0){ cur--; zoom=1; buildThumbs(); show(); } };
-  next.onclick=()=>{ if(cur<items.length-1){ cur++; zoom=1; buildThumbs(); show(); } };
+  function drawWM(){
+    if(!img.naturalWidth||!img.offsetWidth)return;
+    const w=img.offsetWidth,h=img.offsetHeight;
+    const off=document.createElement('canvas');
+    const sw=Math.min(img.naturalWidth,200),sh=Math.min(img.naturalHeight,200);
+    off.width=sw;off.height=sh;
+    const c2=off.getContext('2d');
+    try{
+      c2.drawImage(img,0,0,sw,sh);
+      const d=c2.getImageData(0,0,sw,sh).data;
+      let lum=0;for(let i=0;i<d.length;i+=4)lum+=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000;
+      lum/=(d.length/4);
+      paintWM(w,h,lum>160?'rgba(40,50,60,0.35)':'rgba(255,255,255,0.35)',lum>160?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.4)');
+    }catch(e){paintWM(w,h,'rgba(255,255,255,0.3)','rgba(0,0,0,0.35)');}
+  }
+  function paintWM(w,h,color,shadow){
+    wmCvs.width=w;wmCvs.height=h;
+    wmCvs.style.width=w+'px';wmCvs.style.height=h+'px';
+    wmCvs.style.display='block';
+    const ctx=wmCvs.getContext('2d');
+    ctx.clearRect(0,0,w,h);ctx.save();
+    ctx.translate(w/2,h/2);ctx.rotate(-30*Math.PI/180);
+    const fs=Math.max(14,Math.min(w,h)*0.055);
+    ctx.font='600 '+fs+'px serif';
+    ctx.fillStyle=color;ctx.shadowColor=shadow;ctx.shadowBlur=4;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    const gx=Math.max(180,w*0.45),gy=Math.max(80,h*0.22);
+    for(let y=-h;y<h;y+=gy)for(let x=-w;x<w;x+=gx)ctx.fillText(WM,x,y);
+    ctx.restore();
+  }
+
+  prev.onclick=()=>{if(cur>0){cur--;zoom=1;pdfDoc=null;buildThumbs();show();}};
+  next.onclick=()=>{if(cur<items.length-1){cur++;zoom=1;pdfDoc=null;buildThumbs();show();}};
 
   document.addEventListener('keydown',e=>{
-    if(!lb.classList.contains('open')) return;
-    if(e.key==='ArrowLeft'||e.key==='ArrowUp')    { e.preventDefault(); prev.click(); }
-    if(e.key==='ArrowRight'||e.key==='ArrowDown') { e.preventDefault(); next.click(); }
-    if(e.key==='Escape') fechar();
-    if(e.key==='+'||e.key==='=') zoomIn();
-    if(e.key==='-') zoomOut();
-    if(e.key==='0') setZoom(1);
+    if(!lb.classList.contains('open'))return;
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();prev.click();}
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();next.click();}
+    if(e.key==='Escape')fechar();
+    if(e.key==='+'||e.key==='=')zoomIn();
+    if(e.key==='-')zoomOut();
+    if(e.key==='0')setZoom(1);
   });
 
-  // ── Thumbnails ───────────────────────────────────────────
   function buildThumbs(){
     thumbs.innerHTML=items.map((it,i)=>{
       const src=tipo==='foto'
-        ? (it.thumb||it.url)
-        : `https://drive.google.com/thumbnail?id=${it.id}&sz=w120`;
-      return`<div class="lb-thumb${i===cur?' active':''}" data-i="${i}">
-        <img src="${src}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=lb-thumb-pdf>📄</div>'" />
-      </div>`;
+        ?(it.id?driveImgUrl(it.id):(it.thumb||it.url))
+        :(it.id?'https://drive.google.com/thumbnail?id='+it.id+'&sz=w120':'');
+      return '<div class="lb-thumb'+(i===cur?' active':'')+'" data-i="'+i+'"><img src="'+src+'" loading="lazy" onerror="this.parentElement.innerHTML=\'<div class=lb-thumb-pdf>\u{1F4C4}</div>\'" /></div>';
     }).join('');
     thumbs.querySelectorAll('.lb-thumb').forEach(t=>{
-      t.onclick=()=>{ cur=+t.dataset.i; zoom=1; buildThumbs(); show(); };
+      t.onclick=()=>{cur=+t.dataset.i;zoom=1;pdfDoc=null;buildThumbs();show();};
     });
   }
   function syncThumbActive(){
     thumbs.querySelectorAll('.lb-thumb').forEach((t,i)=>{
       t.classList.toggle('active',i===cur);
-      if(i===cur) t.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
+      if(i===cur)t.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
     });
   }
 })();
 
-// ── Importar configuração de pastas do Drive (JSON) ──────
+// Importar JSON de pastas
 (function(){
-  // Botão de importação no hub
-  const hubFooter = document.querySelector('.hub-footer');
-  const importBtn = document.createElement('label');
-  importBtn.innerHTML=`<input type="file" id="drive-config-input" accept=".json" style="display:none"/>
-    <span style="display:inline-block;margin-top:12px;font-size:10px;font-family:'Cormorant Garamond',serif;letter-spacing:.08em;color:rgba(255,255,255,.2);cursor:pointer;text-decoration:underline;text-underline-offset:3px">
-      Importar configuração de pastas
-    </span>`;
-  hubFooter.appendChild(importBtn);
-
+  const hf=document.querySelector('.hub-footer');
+  const lb=document.createElement('label');
+  lb.innerHTML='<input type="file" id="drive-config-input" accept=".json" style="display:none"/><span style="display:inline-block;margin-top:12px;font-size:10px;font-family:serif;letter-spacing:.08em;color:rgba(255,255,255,.2);cursor:pointer;text-decoration:underline;text-underline-offset:3px">Importar configuração de pastas</span>';
+  hf.appendChild(lb);
   document.getElementById('drive-config-input').addEventListener('change',e=>{
-    const file=e.target.files[0]; if(!file)return;
+    const file=e.target.files[0];if(!file)return;
     const r=new FileReader();
     r.onload=async ev=>{
       try{
         const cfg=JSON.parse(ev.target.result);
         delete cfg._instrucoes;
         let count=0;
-        Object.entries(cfg).forEach(([obra,pastas])=>{ GDRIVE_PASTAS[obra]=pastas; count++; });
+        Object.entries(cfg).forEach(([obra,pastas])=>{GDRIVE_PASTAS[obra]=pastas;count++;});
         await salvarConfigDriveSupabase();
-        alert(`✓ ${count} obra(s) configurada(s) e salvas no servidor!`);
-        if(typeof renderListaObras==='function') renderListaObras();
-      }catch(err){ alert('Erro ao ler o arquivo: '+err.message); }
+        alert('\u2713 '+count+' obra(s) configurada(s) e salvas!');
+        if(typeof renderListaObras==='function')renderListaObras();
+      }catch(err){alert('Erro: '+err.message);}
     };
-    r.readAsText(file); e.target.value='';
+    r.readAsText(file);e.target.value='';
   });
-
-  // Carrega config do Drive do Supabase após login
-  // (chamado em fazerLogin)
 })();
 </script>
 </body>
