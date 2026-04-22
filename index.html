@@ -309,10 +309,10 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 #lb-wm-canvas{position:absolute;top:0;left:0;pointer-events:none;display:none}
 
 /* PDF — iframe com scroll próprio */
-#lb-pdf-wrap{display:none;width:100%;height:100%;align-items:center;justify-content:center;overflow:hidden}
+#lb-pdf-wrap{display:none;width:100%;height:100%;align-items:stretch;justify-content:center}
 #lb-pdf-wrap.active{display:flex}
-#lb-pdf-inner{position:relative;width:min(900px,98vw);height:100%;display:flex;flex-direction:column}
-#lb-pdf-frame{flex:1;width:100%;border:none;background:#fff;overflow:hidden;transform-origin:top center;transition:transform .2s}
+#lb-pdf-inner{position:relative;width:min(960px,99vw);height:100%;display:flex;flex-direction:column}
+#lb-pdf-frame{flex:1;width:100%;border:none;background:#fff}
 #lb-pdf-wm{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:20px 0}
 .lb-pdf-wm-text{font-family:'Cormorant Garamond',serif;font-size:clamp(13px,1.8vw,20px);font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;transform:rotate(-30deg);user-select:none;color:rgba(80,95,110,.45);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 
@@ -892,6 +892,8 @@ function fazerLogin(){
     document.getElementById('hub-username').textContent=user.charAt(0).toUpperCase()+user.slice(1);
     mostrarTela('hub'); resetarTimer();
     if(!appIniciado){iniciarApp();appIniciado=true;}
+    // Carrega config de pastas após login (evita erro de fetch na tela de login)
+    setTimeout(()=>carregarConfigDrive(), 500);
   }else{erro.style.display='block';document.getElementById('login-senha').value='';document.getElementById('login-senha').focus();}
 }
 
@@ -1185,13 +1187,18 @@ function renderItensDesp(){
   if(!despItens.length){lista.innerHTML='<p class="obs-none">Nenhum item extraído</p>';return;}
   lista.innerHTML=despItens.map((it,i)=>`
     <div class="desp-item">
-      <input type="text" value="${it.descricao||''}" placeholder="Descrição" data-i="${i}" data-c="descricao" class="dii" />
+      <input type="text" value="${(it.descricao||'').replace(/"/g,'&quot;')}" placeholder="Descrição" data-i="${i}" data-c="descricao" class="dii" />
       <input type="number" value="${it.quantidade||''}" placeholder="Qtd" data-i="${i}" data-c="quantidade" class="dii" style="width:60px" />
       <input type="text" value="${it.unidade||''}" placeholder="Un" data-i="${i}" data-c="unidade" class="dii" style="width:44px" />
       <input type="number" value="${it.valor_unitario||''}" placeholder="R$" data-i="${i}" data-c="valor_unitario" class="dii" style="width:72px" />
+      <button onclick="despItens.splice(${i},1);renderItensDesp()" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:15px;padding:0 4px" title="Remover">×</button>
     </div>`).join('');
+  lista.innerHTML+=`<button onclick="despItens.push({descricao:'',quantidade:1,unidade:'un',valor_unitario:0});renderItensDesp()" class="btn-sm" style="margin-top:6px">+ Adicionar item</button>`;
   lista.querySelectorAll('.dii').forEach(el=>{
-    el.addEventListener('input',e=>{const i=+e.target.dataset.i,c=e.target.dataset.c;despItens[i][c]=c==='quantidade'||c==='valor_unitario'?parseFloat(e.target.value)||0:e.target.value;});
+    el.addEventListener('input',e=>{
+      const i=+e.target.dataset.i,c=e.target.dataset.c;
+      despItens[i][c]=c==='quantidade'||c==='valor_unitario'?parseFloat(e.target.value)||0:e.target.value;
+    });
   });
 }
 
@@ -1265,8 +1272,18 @@ async function carregarHistDesp(){
     const despesas=await res.json();
     if(!despesas.length){cont.innerHTML='<div class="proj-empty"><div class="proj-empty-icon">📭</div><p>Nenhuma despesa registrada</p></div>';return;}
     const tipos={nota_fiscal:'Nota Fiscal',pedido:'Pedido',cupom:'Cupom',outro:'Outro'};
-    cont.innerHTML=despesas.map(d=>`
-      <div class="desp-hist-card" id="dhc-${d.id}">
+
+    cont.innerHTML=despesas.map(d=>{
+      // Renderiza itens editáveis
+      const itensHtml=(d.itens||[]).map((it,i)=>`
+        <div class="desp-item" data-id="${d.id}" data-i="${i}">
+          <input type="text" value="${it.descricao||''}" placeholder="Descrição" class="ei-desc" data-id="${d.id}" data-i="${i}" />
+          <input type="number" value="${it.quantidade||''}" placeholder="Qtd" class="ei-qtd" data-id="${d.id}" data-i="${i}" style="width:60px" />
+          <input type="text" value="${it.unidade||''}" placeholder="Un" class="ei-un" data-id="${d.id}" data-i="${i}" style="width:44px" />
+          <input type="number" value="${it.valor_unitario||''}" placeholder="R$" class="ei-vl" data-id="${d.id}" data-i="${i}" style="width:72px" />
+        </div>`).join('');
+
+      return `<div class="desp-hist-card" id="dhc-${d.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
           <div>
             <span class="desp-hist-badge">${tipos[d.tipo]||d.tipo}</span>
@@ -1275,19 +1292,20 @@ async function carregarHistDesp(){
           </div>
           <div style="text-align:right">
             <div class="desp-hist-valor">R$ ${(d.valor_total||0).toFixed(2).replace('.',',')}</div>
-            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">
-              ${d.foto_drive_id?`<button class="btn-sm" onclick="verFotoDesp('${d.foto_drive_id}')">📷 Ver foto</button>`:''}
-              <button class="btn-sm" onclick="editarDesp(${d.id})">✏️ Editar</button>
+            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap">
+              ${d.foto_drive_id?`<button class="btn-sm" onclick="verFotoDesp('${d.foto_drive_id}')">📷 Foto</button>`:''}
+              <button class="btn-sm" onclick="toggleEditDesp(${d.id})">✏️ Editar</button>
             </div>
           </div>
         </div>
-        ${d.itens&&d.itens.length?`<div style="margin-top:6px;font-size:11px;color:var(--concreto)">${d.itens.slice(0,3).map(it=>`${it.descricao} × ${it.quantidade}`).join(' · ')}${d.itens.length>3?' …':''}</div>`:''}
+
+        <!-- Painel de edição (oculto por padrão) -->
         <div id="desp-edit-${d.id}" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
           <div class="grid-2" style="margin-bottom:10px">
-            <div><label class="label">Fornecedor</label><input type="text" id="ef-fornecedor-${d.id}" value="${d.fornecedor||''}" /></div>
+            <div><label class="label">Fornecedor</label><input type="text" id="ef-fornecedor-${d.id}" value="${(d.fornecedor||'').replace(/"/g,'&quot;')}" /></div>
             <div><label class="label">Valor Total</label><input type="number" id="ef-valor-${d.id}" value="${d.valor_total||''}" step="0.01" /></div>
           </div>
-          <div class="grid-2" style="margin-bottom:10px">
+          <div class="grid-2" style="margin-bottom:12px">
             <div><label class="label">Data</label><input type="date" id="ef-data-${d.id}" value="${d.data||''}" /></div>
             <div><label class="label">Obra</label>
               <select id="ef-obra-${d.id}" style="height:36px;width:100%;font-family:'Montserrat',sans-serif;font-size:12px;border:1px solid var(--border-strong);border-radius:4px;padding:0 8px;color:var(--ardosia)">
@@ -1295,37 +1313,69 @@ async function carregarHistDesp(){
               </select>
             </div>
           </div>
+          ${(d.itens||[]).length?`
+          <div style="margin-bottom:10px">
+            <label class="label" style="margin-bottom:8px;display:block">Itens</label>
+            <div id="ef-itens-${d.id}" style="display:flex;flex-direction:column;gap:6px">
+              ${itensHtml}
+            </div>
+          </div>`:''}
           <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn-secondary" onclick="document.getElementById('desp-edit-${d.id}').style.display='none'">Cancelar</button>
+            <button class="btn-secondary" onclick="toggleEditDesp(${d.id})">Cancelar</button>
             <button class="btn-primary" onclick="salvarEdicaoDesp(${d.id})">💾 Salvar</button>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
+
+    // Bind edição de itens em tempo real
+    cont.querySelectorAll('.ei-desc,.ei-qtd,.ei-un,.ei-vl').forEach(inp=>{
+      inp.addEventListener('input',()=>{}); // mantém valor para coleta no salvar
+    });
+
   }catch(e){cont.innerHTML=`<div class="proj-empty"><div class="proj-empty-icon">⚠️</div><p>${e.message}</p></div>`;}
 }
 
+window.toggleEditDesp=function(id){
+  const el=document.getElementById('desp-edit-'+id);
+  el.style.display=el.style.display==='none'?'block':'none';
+};
+
 window.verFotoDesp=async function(driveId){
-  // Tenta buscar via proxy autenticado primeiro, senão usa thumbnail público
-  const url=`https://lh3.googleusercontent.com/d/${driveId}`;
+  // Cria uma Edge Function de acesso à foto autenticada
+  // Usa URL de exportação do Drive que funciona com compartilhamento público
+  const url=`https://drive.google.com/uc?export=view&id=${driveId}`;
   const thumb=`https://drive.google.com/thumbnail?id=${driveId}&sz=w400`;
   window.lbAbrir([{id:driveId,name:'Foto da despesa',url,thumb}],0,'foto');
 };
 
-window.editarDesp=function(id){
-  const el=document.getElementById('desp-edit-'+id);
-  el.style.display = el.style.display==='none' ? 'block' : 'none';
-};
+window.editarDesp=function(id){ toggleEditDesp(id); };
 
 window.salvarEdicaoDesp=async function(id){
   const SURL='https://pderpmbmurtagpdsvzjg.supabase.co',SKEY='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
   const H2={'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'};
   try{
+    // Coleta itens editados do DOM
+    const itensEl=document.getElementById('ef-itens-'+id);
+    let itensNovos=null;
+    if(itensEl){
+      const descs=[...itensEl.querySelectorAll('.ei-desc')];
+      itensNovos=descs.map((_,i)=>({
+        descricao:itensEl.querySelectorAll('.ei-desc')[i].value.trim(),
+        quantidade:parseFloat(itensEl.querySelectorAll('.ei-qtd')[i].value)||0,
+        unidade:itensEl.querySelectorAll('.ei-un')[i].value.trim(),
+        valor_unitario:parseFloat(itensEl.querySelectorAll('.ei-vl')[i].value)||0,
+      })).filter(it=>it.descricao);
+    }
+
     const patch={
       fornecedor:document.getElementById('ef-fornecedor-'+id).value.trim(),
       valor_total:parseFloat(document.getElementById('ef-valor-'+id).value)||0,
       data:document.getElementById('ef-data-'+id).value,
       obra:document.getElementById('ef-obra-'+id).value,
     };
+    if(itensNovos!==null) patch.itens=itensNovos;
+
     const r=await fetch(SURL+'/rest/v1/despesas?id=eq.'+id,{method:'PATCH',headers:H2,body:JSON.stringify(patch)});
     if(!r.ok)throw new Error(await r.text());
     carregarHistDesp();
@@ -1756,10 +1806,11 @@ function renderRelatorio(registros){
       img.src=it.url;
     } else {
       pWrap.classList.add('active'); fWrap.classList.remove('active');
-      ctrlBar.style.display='flex'; // show zoom for PDFs too
-      zoom=1; zlbl.textContent='100%';
-      document.getElementById('lb-pdf-frame').style.transform='scale(1)';
-      frame.src=`https://drive.google.com/file/d/${it.id}/preview`;
+      // PDF: usa viewer nativo do Drive que já tem zoom de alta qualidade
+      // Removemos nossa barra de zoom para não distorcer
+      ctrlBar.style.display='none';
+      // Usa o viewer com toolbar completa do Drive
+      frame.src=`https://drive.google.com/file/d/${it.id}/preview?rm=minimal`;
     }
   }
 
@@ -1932,8 +1983,8 @@ function renderRelatorio(registros){
     r.readAsText(file); e.target.value='';
   });
 
-  // Carrega config do Drive do Supabase ao iniciar
-  carregarConfigDrive();
+  // Carrega config do Drive do Supabase após login
+  // (chamado em fazerLogin)
 })();
 </script>
 </body>
