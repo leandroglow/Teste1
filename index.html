@@ -312,9 +312,7 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 #lb-pdf-wrap{display:none;width:100%;height:100%;align-items:center;justify-content:center;overflow:hidden}
 #lb-pdf-wrap.active{display:flex}
 #lb-pdf-inner{position:relative;width:min(900px,98vw);height:100%;display:flex;flex-direction:column}
-#lb-pdf-frame{flex:1;width:100%;border:none;background:#fff;
-  /* scroll dentro do iframe é do próprio PDF */
-  overflow:hidden}
+#lb-pdf-frame{flex:1;width:100%;border:none;background:#fff;overflow:hidden;transform-origin:top center;transition:transform .2s}
 #lb-pdf-wm{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:20px 0}
 .lb-pdf-wm-text{font-family:'Cormorant Garamond',serif;font-size:clamp(13px,1.8vw,20px);font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;transform:rotate(-30deg);user-select:none;color:rgba(80,95,110,.45);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 
@@ -749,18 +747,49 @@ const USUARIOS={'leandro':'download1','wiliam':'wiliam123'};
 
 // ── Google Drive ─────────────────────────────────────────
 const GDRIVE_KEY='AIzaSyBUoEB4qeeIl0dTLDg6AbS-gQL6sTNf__Q';
+const SBASE_ANON='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
+const SBASE_URL='https://pderpmbmurtagpdsvzjg.supabase.co';
 
-// Para cada obra configure 3 IDs de pasta (raiz de cada categoria).
-// A pasta de Projeto pode ter subpastas — o app navega automaticamente.
-// Renders e Fotos mostram imagens soltas + imagens dentro de subpastas.
-const GDRIVE_PASTAS={
+// Pastas padrão — sobrescritas pelo JSON importado ou pelo Supabase
+let GDRIVE_PASTAS={
   'Chácara Lobo Guará':{
-    renders: '1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
-    projeto: '1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
-    fotos:   '1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
+    renders:'1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
+    projeto:'1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
+    fotos:  '1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
   },
-  // 'Casa do Lago AC20':{ renders:'ID', projeto:'ID', fotos:'ID' },
 };
+
+// Carrega config do Supabase ao iniciar
+window.carregarConfigDrive = async function(){
+  try{
+    const res=await fetch(SBASE_URL+'/rest/v1/configuracoes?chave=eq.gdrive_pastas&select=valor',{
+      headers:{'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON}
+    });
+    const rows=await res.json();
+    if(rows&&rows.length&&rows[0].valor){
+      GDRIVE_PASTAS=rows[0].valor;
+      renderListaObras(); // atualiza status das obras
+    }
+  }catch(e){ console.warn('Config Drive não carregada:', e.message); }
+}
+
+window.salvarConfigDriveSupabase = async function(){
+  const H={'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
+  const r=await fetch(SBASE_URL+'/rest/v1/configuracoes',{
+    method:'POST',
+    headers:H,
+    body:JSON.stringify({chave:'gdrive_pastas',valor:GDRIVE_PASTAS,atualizado_em:new Date().toISOString()})
+  });
+  if(!r.ok){
+    const err=await r.text();
+    // Se der erro de RLS, tenta via upsert com patch
+    if(err.includes('row-level security')){
+      console.warn('RLS bloqueou insert — tente rodar no SQL Editor: create policy "allow all" on configuracoes for all using (true) with check (true);');
+      throw new Error('Permissão negada. Rode a policy de RLS no Supabase SQL Editor.');
+    }
+    throw new Error(err);
+  }
+}
 
 async function gdriveListar(folderId, mime=''){
   let q=`'${folderId}' in parents and trashed=false`;
@@ -892,7 +921,7 @@ function projMostrar(nivel){
   document.getElementById('proj-subpasta').style.display  = nivel===3?'block':'none';
 }
 
-function renderListaObras(){
+window.renderListaObras = function(){
   document.getElementById('proj-lista').innerHTML=OBRAS.map(obra=>`
     <button class="proj-obra-btn" onclick="abrirObra('${obra.replace(/'/g,"\\'")}')">
       <div class="proj-obra-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.8"><polygon points="3 9 12 2 21 9 21 20 3 20"/><rect x="9" y="13" width="6" height="7"/></svg></div>
@@ -1082,7 +1111,6 @@ document.getElementById('proj-back-cat').addEventListener('click',()=>{
 
 // ── OPENAI CONFIG ────────────────────────────────────────
 const OPENAI_PROXY='https://pderpmbmurtagpdsvzjg.supabase.co/functions/v1/openai-proxy';
-const SBASE_ANON='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
 const GDRIVE_DESP_FOLDER='1665zvQOtbulPR59zjFLr37mflu9n31Yo';
 
 async function openaiChat(messages, max_tokens=800){
@@ -1224,6 +1252,10 @@ document.getElementById('desp-tab-hist').addEventListener('click',async()=>{
   document.getElementById('desp-tab-hist').classList.add('active');
   document.getElementById('desp-nova').style.display='none';
   document.getElementById('desp-hist').style.display='block';
+  carregarHistDesp();
+});
+
+async function carregarHistDesp(){
   const cont=document.getElementById('desp-hist-conteudo');
   cont.innerHTML='<div class="proj-empty"><div class="big-spinner"></div><p>Carregando...</p></div>';
   try{
@@ -1234,20 +1266,71 @@ document.getElementById('desp-tab-hist').addEventListener('click',async()=>{
     if(!despesas.length){cont.innerHTML='<div class="proj-empty"><div class="proj-empty-icon">📭</div><p>Nenhuma despesa registrada</p></div>';return;}
     const tipos={nota_fiscal:'Nota Fiscal',pedido:'Pedido',cupom:'Cupom',outro:'Outro'};
     cont.innerHTML=despesas.map(d=>`
-      <div class="desp-hist-card">
+      <div class="desp-hist-card" id="dhc-${d.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
           <div>
             <span class="desp-hist-badge">${tipos[d.tipo]||d.tipo}</span>
             <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:var(--ardosia);margin-top:3px">${d.fornecedor||'—'}</div>
             <div style="font-size:11px;color:var(--concreto);margin-top:2px">${d.obra||''} · ${d.data?d.data.split('-').reverse().join('/'):'—'}</div>
           </div>
-          <div class="desp-hist-valor">R$ ${(d.valor_total||0).toFixed(2).replace('.',',')}</div>
+          <div style="text-align:right">
+            <div class="desp-hist-valor">R$ ${(d.valor_total||0).toFixed(2).replace('.',',')}</div>
+            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">
+              ${d.foto_drive_id?`<button class="btn-sm" onclick="verFotoDesp('${d.foto_drive_id}')">📷 Ver foto</button>`:''}
+              <button class="btn-sm" onclick="editarDesp(${d.id})">✏️ Editar</button>
+            </div>
+          </div>
         </div>
-        ${d.foto_drive_id?`<a href="https://drive.google.com/file/d/${d.foto_drive_id}/view" target="_blank" style="font-size:11px;color:var(--ambar)">📎 Ver foto</a>`:''}
         ${d.itens&&d.itens.length?`<div style="margin-top:6px;font-size:11px;color:var(--concreto)">${d.itens.slice(0,3).map(it=>`${it.descricao} × ${it.quantidade}`).join(' · ')}${d.itens.length>3?' …':''}</div>`:''}
+        <div id="desp-edit-${d.id}" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+          <div class="grid-2" style="margin-bottom:10px">
+            <div><label class="label">Fornecedor</label><input type="text" id="ef-fornecedor-${d.id}" value="${d.fornecedor||''}" /></div>
+            <div><label class="label">Valor Total</label><input type="number" id="ef-valor-${d.id}" value="${d.valor_total||''}" step="0.01" /></div>
+          </div>
+          <div class="grid-2" style="margin-bottom:10px">
+            <div><label class="label">Data</label><input type="date" id="ef-data-${d.id}" value="${d.data||''}" /></div>
+            <div><label class="label">Obra</label>
+              <select id="ef-obra-${d.id}" style="height:36px;width:100%;font-family:'Montserrat',sans-serif;font-size:12px;border:1px solid var(--border-strong);border-radius:4px;padding:0 8px;color:var(--ardosia)">
+                ${OBRAS.map(o=>`<option${o===d.obra?' selected':''}>${o}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn-secondary" onclick="document.getElementById('desp-edit-${d.id}').style.display='none'">Cancelar</button>
+            <button class="btn-primary" onclick="salvarEdicaoDesp(${d.id})">💾 Salvar</button>
+          </div>
+        </div>
       </div>`).join('');
   }catch(e){cont.innerHTML=`<div class="proj-empty"><div class="proj-empty-icon">⚠️</div><p>${e.message}</p></div>`;}
-});
+}
+
+window.verFotoDesp=async function(driveId){
+  // Tenta buscar via proxy autenticado primeiro, senão usa thumbnail público
+  const url=`https://lh3.googleusercontent.com/d/${driveId}`;
+  const thumb=`https://drive.google.com/thumbnail?id=${driveId}&sz=w400`;
+  window.lbAbrir([{id:driveId,name:'Foto da despesa',url,thumb}],0,'foto');
+};
+
+window.editarDesp=function(id){
+  const el=document.getElementById('desp-edit-'+id);
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+};
+
+window.salvarEdicaoDesp=async function(id){
+  const SURL='https://pderpmbmurtagpdsvzjg.supabase.co',SKEY='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
+  const H2={'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'};
+  try{
+    const patch={
+      fornecedor:document.getElementById('ef-fornecedor-'+id).value.trim(),
+      valor_total:parseFloat(document.getElementById('ef-valor-'+id).value)||0,
+      data:document.getElementById('ef-data-'+id).value,
+      obra:document.getElementById('ef-obra-'+id).value,
+    };
+    const r=await fetch(SURL+'/rest/v1/despesas?id=eq.'+id,{method:'PATCH',headers:H2,body:JSON.stringify(patch)});
+    if(!r.ok)throw new Error(await r.text());
+    carregarHistDesp();
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+};
 
 // ── ASSISTENTE ───────────────────────────────────────────
 let chatIniciado=false, chatHistorico=[];
@@ -1612,7 +1695,7 @@ function renderRelatorio(registros){
 <script>
 (function(){
   let items=[], cur=0, tipo='foto', zoom=1;
-  const STEP=0.25, MAX=5, MIN=0.25;
+  const STEP=0.25, MAX=8, MIN=0.25;
   const WM_TEXT='Ágora Construtora';
 
   const lb     = document.getElementById('lightbox');
@@ -1673,7 +1756,9 @@ function renderRelatorio(registros){
       img.src=it.url;
     } else {
       pWrap.classList.add('active'); fWrap.classList.remove('active');
-      ctrlBar.style.display='none';
+      ctrlBar.style.display='flex'; // show zoom for PDFs too
+      zoom=1; zlbl.textContent='100%';
+      document.getElementById('lb-pdf-frame').style.transform='scale(1)';
       frame.src=`https://drive.google.com/file/d/${it.id}/preview`;
     }
   }
@@ -1717,9 +1802,22 @@ function renderRelatorio(registros){
 
   // ── Zoom (scroll-based, não transform da página) ─────────
   function applyZoom(){
+    zlbl.textContent=Math.round(zoom*100)+'%';
+    if(tipo==='pdf'){
+      const fr=document.getElementById('lb-pdf-frame');
+      const pInner=document.getElementById('lb-pdf-inner');
+      // Escala o iframe e ajusta o container para scroll funcionar
+      fr.style.transform=`scale(${zoom})`;
+      fr.style.transformOrigin='top center';
+      fr.style.width='100%';
+      fr.style.height=`${100/zoom}%`;
+      pInner.style.overflow= zoom>1 ? 'auto' : 'hidden';
+      pInner.style.height='100%';
+      imgCon.classList.remove('zoomed');
+      return;
+    }
     if(!img.naturalWidth) return;
     const nw=img.naturalWidth, nh=img.naturalHeight;
-    // Em zoom 1: limita ao viewport. Com zoom >1: mostra em tamanho real escalado
     const baseW=Math.min(nw, window.innerWidth*0.9);
     const baseH=Math.min(nh, (window.innerHeight-200)*0.9);
     const scale=Math.min(baseW/nw, baseH/nh);
@@ -1730,9 +1828,7 @@ function renderRelatorio(registros){
     img.style.transform='';
     wmCvs.style.width=newW+'px'; wmCvs.style.height=newH+'px';
     wmCvs.width=newW; wmCvs.height=newH;
-    zlbl.textContent=Math.round(zoom*100)+'%';
     imgCon.classList.toggle('zoomed',zoom>1);
-    // Centraliza quando menor que container
     const fw=fWrap.clientWidth, fh=fWrap.clientHeight;
     imgCon.style.marginLeft = newW<fw ? Math.round((fw-newW)/2)+'px' : '8px';
     imgCon.style.marginTop  = newH<fh ? Math.round((fh-newH)/2)+'px' : '8px';
@@ -1822,25 +1918,22 @@ function renderRelatorio(registros){
   document.getElementById('drive-config-input').addEventListener('change',e=>{
     const file=e.target.files[0]; if(!file)return;
     const r=new FileReader();
-    r.onload=ev=>{
+    r.onload=async ev=>{
       try{
         const cfg=JSON.parse(ev.target.result);
-        // cfg deve ter o formato: { "Obra X": { renders:"ID", projeto:"ID", fotos:"ID" }, ... }
+        delete cfg._instrucoes;
         let count=0;
-        Object.entries(cfg).forEach(([obra,pastas])=>{
-          if(typeof GDRIVE_PASTAS[obra]!=='undefined'||true){
-            GDRIVE_PASTAS[obra]=pastas; count++;
-          }
-        });
-        alert(`✓ ${count} obra(s) configurada(s) com sucesso!`);
-        // Atualiza lista de obras para refletir novas configurações
+        Object.entries(cfg).forEach(([obra,pastas])=>{ GDRIVE_PASTAS[obra]=pastas; count++; });
+        await salvarConfigDriveSupabase();
+        alert(`✓ ${count} obra(s) configurada(s) e salvas no servidor!`);
         if(typeof renderListaObras==='function') renderListaObras();
-      }catch(err){
-        alert('Erro ao ler o arquivo: '+err.message);
-      }
+      }catch(err){ alert('Erro ao ler o arquivo: '+err.message); }
     };
     r.readAsText(file); e.target.value='';
   });
+
+  // Carrega config do Drive do Supabase ao iniciar
+  carregarConfigDrive();
 })();
 </script>
 </body>
