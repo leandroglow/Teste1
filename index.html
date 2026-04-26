@@ -652,6 +652,24 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
     ></iframe>
   </div>
 
+  <!-- APRESENTAÇÃO -->
+  <div id="secao-apresentacao" style="display:none;height:calc(100vh - 56px);flex-direction:column;background:var(--argamassa)">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--white);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div id="apresentacao-titulo" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ardosia)">Apresentação</div>
+        <div id="apresentacao-subtitulo" style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--concreto);margin-top:3px">Visualização incorporada</div>
+      </div>
+      <button class="btn-sm" id="btn-apresentacao-voltar">← Voltar para a obra</button>
+    </div>
+    <iframe
+      id="iframe-apresentacao"
+      src=""
+      allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"
+      style="flex:1;width:100%;border:none;display:block;background:var(--white)"
+    ></iframe>
+  </div>
+
   <!-- DESPESAS -->
   <div id="secao-despesas" style="display:none">
     <div class="container" style="max-width:760px">
@@ -734,6 +752,7 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 
 <style>
 #secao-tour360.active{ display:flex!important; }
+#secao-apresentacao.active{ display:flex!important; }
 #secao-assistente.active{ display:flex!important; }
 
 /* Chat */
@@ -765,9 +784,6 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 <script>
 const OBRAS=['Casa do Lago AC20','Evidencias K21','Salto M14','Chácara Lobo Guará','Milano P4','Milano P3','Di Roma E6','Galpão Smart City Q33 L25'];
 const USUARIOS={'leandro':'download1','wiliam':'wiliam123'};
-const APRESENTACOES_OBRAS={
-  'Galpão Smart City Q33 L25':'https://leandroglow.github.io/Teste104/'
-};
 
 const PROJETOS_INFO_LOCAL={
   'Galpão Smart City Q33 L25': `# Galpão Smart City Q33 L25
@@ -935,6 +951,10 @@ let GDRIVE_PASTAS={
     fotos:  '1J3kj6ENZNz5D9p4nJGclkPe17NbObzy1',
   },
 };
+let APRESENTACOES_OBRAS={
+  'Galpão Smart City Q33 L25':'https://leandroglow.github.io/Teste104/',
+  'Salto M14':'https://leandroglow.github.io/Teste104/salto-m14/'
+};
 
 // Carrega config do Supabase ao iniciar
 window.carregarConfigDrive = async function(){
@@ -948,6 +968,19 @@ window.carregarConfigDrive = async function(){
       renderListaObras(); // atualiza status das obras
     }
   }catch(e){ console.warn('Config Drive não carregada:', e.message); }
+}
+
+window.carregarConfigApresentacoes = async function(){
+  try{
+    const res=await fetch(SBASE_URL+'/rest/v1/configuracoes?chave=eq.apresentacoes_obras&select=valor',{
+      headers:{'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON}
+    });
+    const rows=await res.json();
+    if(rows&&rows.length&&rows[0].valor && typeof rows[0].valor==='object'){
+      APRESENTACOES_OBRAS={...APRESENTACOES_OBRAS,...rows[0].valor};
+      renderListaObras();
+    }
+  }catch(e){ console.warn('Config Apresentações não carregada:', e.message); }
 }
 
 window.salvarConfigDriveSupabase = async function(){
@@ -966,6 +999,16 @@ window.salvarConfigDriveSupabase = async function(){
     }
     throw new Error(err);
   }
+}
+
+window.salvarConfigApresentacoesSupabase = async function(){
+  const H={'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
+  const r=await fetch(SBASE_URL+'/rest/v1/configuracoes',{
+    method:'POST',
+    headers:H,
+    body:JSON.stringify({chave:'apresentacoes_obras',valor:APRESENTACOES_OBRAS,atualizado_em:new Date().toISOString()})
+  });
+  if(!r.ok) throw new Error(await r.text());
 }
 
 async function gdriveListar(folderId, mime=''){
@@ -1016,7 +1059,7 @@ function mostrarTela(t){
 }
 
 // Projetos — estado de navegação (declarado aqui para uso em abrirSecao)
-let obraAtual=null, pastaAtual=null;
+let obraAtual=null, pastaAtual=null, apresentacaoAtualUrl='';
 
 function abrirSecao(secao){
   mostrarTela('app');
@@ -1025,11 +1068,18 @@ function abrirSecao(secao){
   });
   // Seções que usam flex
   const t360=document.getElementById('secao-tour360');
+  const tApr=document.getElementById('secao-apresentacao');
   const tAss=document.getElementById('secao-assistente');
   if(secao==='tour360'){
     t360.classList.add('active');
     document.getElementById('iframe-360').src='https://tour.panoee.net/69bc6190d6502a64be736319/dji_20260319131928_0021_d';
   } else { t360.classList.remove('active'); }
+  if(secao==='apresentacao'){
+    tApr.classList.add('active');
+  } else {
+    tApr.classList.remove('active');
+    document.getElementById('iframe-apresentacao').src='about:blank';
+  }
   if(secao==='assistente'){
     tAss.classList.add('active');
     if(!chatIniciado) iniciarChat();
@@ -1038,7 +1088,7 @@ function abrirSecao(secao){
   if(secao==='projetos'){ projMostrar(1); obraAtual=null; pastaAtual=null; }
   if(secao==='despesas'){ popularSelectDesp(); }
 
-  const tit={diario:'Diário de Obra',relatorio:'Relatórios',projetos:'Projetos',tour360:'Obras 360°',despesas:'Despesas',assistente:'Assistente'};
+  const tit={diario:'Diário de Obra',relatorio:'Relatórios',projetos:'Projetos',tour360:'Obras 360°',apresentacao:'Apresentação',despesas:'Despesas',assistente:'Assistente'};
   document.getElementById('header-secao-titulo').textContent=tit[secao]||'';
   const hr=document.getElementById('header-right-btns');
   hr.innerHTML='';
@@ -1070,7 +1120,10 @@ function fazerLogin(){
     mostrarTela('hub'); resetarTimer();
     if(!appIniciado){iniciarApp();appIniciado=true;}
     // Carrega config de pastas após login (evita erro de fetch na tela de login)
-    setTimeout(()=>carregarConfigDrive(), 500);
+    setTimeout(()=>{
+      carregarConfigDrive();
+      carregarConfigApresentacoes();
+    }, 500);
   }else{erro.style.display='block';document.getElementById('login-senha').value='';document.getElementById('login-senha').focus();}
 }
 
@@ -1085,6 +1138,8 @@ document.getElementById('btn-voltar-hub').addEventListener('click',()=>{
   // Para o iframe 360 ao sair
   document.getElementById('iframe-360').src='';
   document.getElementById('secao-tour360').classList.remove('active');
+  document.getElementById('iframe-apresentacao').src='about:blank';
+  document.getElementById('secao-apresentacao').classList.remove('active');
   mostrarTela('hub');
 });
 document.getElementById('btn-logout').addEventListener('click',()=>{
@@ -1106,7 +1161,7 @@ window.renderListaObras = function(){
       <div class="proj-obra-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.8"><polygon points="3 9 12 2 21 9 21 20 3 20"/><rect x="9" y="13" width="6" height="7"/></svg></div>
       <div>
         <div class="proj-obra-name">${obra}</div>
-        <div class="proj-obra-sub">${GDRIVE_PASTAS[obra]?'Drive conectado':'Sem pasta configurada'}</div>
+        <div class="proj-obra-sub">${GDRIVE_PASTAS[obra]?'Drive conectado':'Sem pasta configurada'} • ${APRESENTACOES_OBRAS[obra]?'apresentação pronta':'sem apresentação'}</div>
       </div>
       <svg class="proj-obra-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     </button>`).join('');
@@ -1172,15 +1227,11 @@ window.abrirApresentacaoObra=function(){
     return;
   }
 
-  cont.innerHTML=`<div class="proj-cat-title">Apresentação</div>
-    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
-      <div>
-        <span class="card-title" style="margin-bottom:4px">Apresentação do ${obraAtual}</span>
-        <p class="hint" style="margin:0">Abrir a apresentação comercial/técnica publicada.</p>
-      </div>
-      <a class="btn-primary" href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px">Abrir apresentação</a>
-    </div>`;
-  window.open(url,'_blank','noopener,noreferrer');
+  apresentacaoAtualUrl=url;
+  document.getElementById('apresentacao-titulo').textContent='Apresentação';
+  document.getElementById('apresentacao-subtitulo').textContent=obraAtual;
+  document.getElementById('iframe-apresentacao').src=url;
+  abrirSecao('apresentacao');
 };
 
 window.importarMdObra=function(input){
@@ -1372,6 +1423,13 @@ document.getElementById('proj-back-cat').addEventListener('click',()=>{
   projMostrar(2);
   document.getElementById('header-secao-titulo').textContent=obraAtual;
   pastaAtual=null;
+});
+document.getElementById('btn-apresentacao-voltar').addEventListener('click',()=>{
+  document.getElementById('iframe-apresentacao').src='about:blank';
+  document.getElementById('secao-apresentacao').classList.remove('active');
+  document.getElementById('secao-projetos').style.display='block';
+  document.getElementById('header-secao-titulo').textContent=obraAtual||'Projetos';
+  projMostrar(2);
 });
 
 // ── OPENAI CONFIG ────────────────────────────────────────
