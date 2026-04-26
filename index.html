@@ -220,7 +220,7 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 .proj-obra-inner{display:none;padding:1.25rem 1rem;max-width:720px;margin:0 auto}
 .proj-inner-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ardosia);margin-bottom:4px}
 .proj-inner-sub{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--concreto);margin-bottom:1.5rem}
-.proj-sub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.proj-sub-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
 .proj-sub-btn{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:24px 12px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .proj-sub-btn:hover{border-color:var(--ambar);box-shadow:0 2px 12px rgba(212,136,10,.12)}
 .proj-sub-icon{width:44px;height:44px;border-radius:10px;background:var(--argamassa);border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
@@ -261,7 +261,7 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
   .hub-marca{ font-size:36px }
   .container{ padding:1rem .75rem }
   .grid-2{ grid-template-columns:1fr }
-  .proj-sub-grid{ grid-template-columns:repeat(3,1fr); gap:8px }
+  .proj-sub-grid{ grid-template-columns:repeat(2,1fr); gap:8px }
   .proj-sub-btn{ padding:16px 8px }
   .proj-sub-label{ font-size:10px }
   .header{ padding:.7rem 1rem }
@@ -618,6 +618,13 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
           <span class="proj-sub-label">Informações</span>
           <span class="proj-sub-desc">Dados para o assistente</span>
         </div>
+        <div class="proj-sub-btn" id="btn-cat-apresentacao" onclick="abrirApresentacaoObra()">
+          <div class="proj-sub-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ardosia)" stroke-width="1.8"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>
+          </div>
+          <span class="proj-sub-label">Apresentação</span>
+          <span class="proj-sub-desc">PDF / página comercial</span>
+        </div>
       </div>
       <!-- Conteúdo da categoria (imagens, subpastas, PDFs) -->
       <div id="proj-cat-conteudo" style="margin-top:1.5rem"></div>
@@ -756,8 +763,164 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 </style>
 
 <script>
-const OBRAS=['Casa do Lago AC20','Evidencias K21','Salto M14','Chácara Lobo Guará','Milano P4','Milano P3','Di Roma E6'];
+const OBRAS=['Casa do Lago AC20','Evidencias K21','Salto M14','Chácara Lobo Guará','Milano P4','Milano P3','Di Roma E6','Galpão Smart City Q33 L25'];
 const USUARIOS={'leandro':'download1','wiliam':'wiliam123'};
+const APRESENTACOES_OBRAS={
+  'Galpão Smart City Q33 L25':'https://leandroglow.github.io/Teste104/'
+};
+
+const PROJETOS_INFO_LOCAL={
+  'Galpão Smart City Q33 L25': `# Galpão Smart City Q33 L25
+
+Data de referência: 25/04/2026
+
+## Papel do assistente nesta obra
+
+Responder como assistente técnico de engenharia, orçamento, compras e controle de obra.
+Usar português do Brasil, moeda em R$ com vírgula decimal e sempre separar dados confirmados, estimativas e pendências.
+Não tratar o orçamento como valor definitivo. Fundação, estrutura, elétrica, SPDA, hidráulica, drenagem e incêndio exigem validação por profissional habilitado.
+
+## Resumo do projeto
+
+- Terreno: 7,50 x 20,00 m = 150,00 m².
+- Galpão: 7,50 x 14,00 m = 105,00 m².
+- Mezanino: 75,00 m².
+- Uso do térreo: loja + estoque.
+- Uso do mezanino: escritório + estoque de itens menores.
+- Pé-direito previsto: aproximadamente 7,00 m, pendente de confirmação final.
+- Portão frontal: referência de 5,25 m do chão até a viga e 4,20 m de largura; altura útil final pendente.
+
+## Escopo considerado como construção
+
+- Plataforma de acessibilidade.
+- Porta automática.
+- Porta lateral.
+- Infraestrutura de internet.
+- Tubulação para jardim.
+- Reservatório e preparação associada.
+
+## Fora do orçamento do galpão por enquanto
+
+- Fachada e comunicação visual.
+- Mobiliário da loja.
+- Prateleiras, balcão e expositores.
+- Operação comercial da loja.
+
+## Totais atuais do orçamento
+
+- Total confirmado: R$ 93.040,97.
+- Total estimado parcial adicional: R$ 28.704,26.
+- Total com estimativas acumuladas: R$ 121.745,23.
+- Total geral definitivo: PENDENTE.
+
+## Totais confirmados por grupo
+
+- Estrutura em concreto armado: R$ 34.462,82.
+- Perfuração das brocas: R$ 2.064,00.
+- Serviços técnicos complementares: R$ 5.320,00.
+- Plataforma elevatória/acessibilidade: R$ 29.890,00.
+- Porta automática de enrolar: R$ 10.854,13.
+- Telhas Zincatto orçamento 6135: R$ 10.450,02.
+
+## Estrutura, fundação e cobertura
+
+- Base estrutural: planilha e relatório estrutural rev5.
+- Brocas: 172,00 m lineares, diâmetro 30 cm, fornecedor de referência Gera Fundações, R$ 12,00/m.
+- Cobertura: orçamento Zincatto 6135 escolhido por ser mais barato; 6136 mantido como comparativo.
+- Telha considerada: TR 40/1000 telha galvanizada sanduíche EPS 30 mm, chapa 0,43 mm, preto inferior.
+- Valor das telhas Zincatto 6135: R$ 10.450,02. À vista sem nota fiscal: R$ 9.866,22.
+- Ainda faltam itens complementares de cobertura: cumeeiras, calhas, rufos, fixadores, frete, montagem e arremates, se não estiverem inclusos.
+
+## Piso térreo
+
+- Área: 105,00 m².
+- Espessura: 12 cm.
+- Volume estimado de concreto: 12,60 m³.
+- Concreto: FCK 30 MPa, preço ainda pendente.
+- Serviço de piso polido: R$ 2.500,00, ESTIMADO.
+- Bombeamento do térreo: R$ 1.000,00, ESTIMADO.
+- Armadura: primeiros 4,00 m com malha dupla Q61 15x15; restante com malha simples.
+- Tela considerada: 2,00 x 3,00 m, transpasse mínimo de 30 cm, R$ 42,00 por peça, ainda a confirmar.
+- Quantidade estimada: 14 telas para malha dupla na entrada e 17 telas para malha simples no restante.
+
+## Mezanino, banheiros e copa
+
+- Revestimento cerâmico: 75,00 m² no mezanino + 60,00 m² nos 3 banheiros = 135,00 m².
+- Cerâmica: R$ 40,00/m², ESTIMADO.
+- Instalação: R$ 40,00/m², ESTIMADO.
+- Argamassa 20 kg: R$ 21,00/saco, consumo adotado de 1 saco a cada 2,00 m².
+- Banheiros: 3 unidades com composição básica; 1 deles com chuveiro.
+- Louças e metais dos 3 banheiros: R$ 4.095,00, ESTIMADO.
+- Chuveiro: R$ 200,00.
+- Copa do mezanino: pia, torneira, acabamento de registro e registro de gaveta, total estimado de R$ 570,00.
+- Bancada de concreto dos banheiros: fora do orçamento por enquanto.
+- Box e ducha higiênica: não considerar por enquanto.
+
+## Jardim vertical e reservatório
+
+- Jardim vertical: 7,20 m² a R$ 500,00/m² = R$ 3.600,00.
+- O valor do jardim inclui estrutura, vasos, substrato, plantas, mangueiras e irrigação.
+- Controlador de irrigação: R$ 800,00.
+- Caixa d'água Fortlev 1000 L: R$ 424,87.
+- Boia: R$ 60,00.
+- Flange 25 mm: 2 unidades a R$ 30,00.
+- Flange 50 mm: 1 unidade a R$ 50,00.
+- Tubos e conexões gerais da caixa d'água ficaram para a frente de hidráulica.
+
+## Plataforma e acessibilidade
+
+- Plataforma elevatória em aço carbono, percurso útil 4,00 m e 2 paradas: R$ 18.800,00.
+- Meia cabine em aço carbono: R$ 4.300,00.
+- 2 portas de pavimento em alumínio linha gold automatizadas com trava eletromecânica: R$ 7.000,00.
+- Frete e mobilização: R$ 570,00.
+- Subtotal plataforma/acessibilidade: R$ 29.890,00.
+- Forma de pagamento informada: 30% após contrato e 70% após instalação.
+- Pendências críticas: confirmar ART, cabo de alimentação e exigências elétricas.
+
+## Porta automática
+
+- Porta automática de enrolar completa: R$ 10.854,13, conforme cotação LADOFER 0592/26.
+- O PDF também mostra R$ 10.310,00; confirmar com o fornecedor qual valor final aplicar.
+
+## Pendências principais
+
+- Confirmar preço do concreto FCK 30 MPa do piso.
+- Confirmar quantitativo final das telas Q61.
+- Confirmar escopo completo do orçamento Zincatto 6135.
+- Confirmar valor final da porta automática.
+- Confirmar ART da plataforma.
+- Confirmar cabo de alimentação e escopo elétrico da plataforma.
+- Conferir se taxa municipal de aprovação já foi paga.
+- Cotar forma/mão de obra da estrutura, pois a planilha mostra 308,14 m² de forma sem preço unitário.
+
+## Documentos ou projetos faltantes
+
+- Projeto elétrico.
+- Projeto hidráulico.
+- Drenagem pluvial.
+- SPDA/aterramento.
+- Documentação de incêndio/segurança.
+- Memorial descritivo completo.
+- Quadro consolidado de áreas e acabamentos.
+
+## Riscos técnicos
+
+- Alto: elétrica, SPDA/aterramento, incêndio/segurança, drenagem pluvial, piso industrial e validação das estacas.
+- Médio: cobertura completa, altura útil do portão, forma sem preço, valor final da porta automática e revisão vigente das folhas estruturais.
+
+## Perguntas que o assistente deve priorizar
+
+- Já existe taxa municipal de aprovação paga?
+- A plataforma inclui ART, instalação completa, cabo de alimentação e proteções elétricas?
+- Qual é o valor final da porta automática: R$ 10.854,13 ou R$ 10.310,00?
+- O concreto FCK 30 MPa do piso já foi cotado?
+- O orçamento Zincatto 6135 inclui cumeeiras, rufos, calhas, parafusos, arremates, instalação e frete?
+- Existem projetos elétrico, hidráulico, drenagem, SPDA e incêndio?
+
+## Resposta padrão sobre status
+
+O orçamento está consolidado para conferência e compra inicial, mas ainda não é valor fechado de obra. O total confirmado é R$ 93.040,97, o total com estimativas acumuladas é R$ 121.745,23 e o total definitivo permanece PENDENTE por falta de projetos, preços e validações técnicas.`
+};
 
 // ── Google Drive ─────────────────────────────────────────
 const GDRIVE_KEY='AIzaSyBUoEB4qeeIl0dTLDg6AbS-gQL6sTNf__Q';
@@ -954,7 +1117,7 @@ window.abrirObra=function(obra){
   document.getElementById('proj-inner-nome').textContent=obra;
   document.getElementById('header-secao-titulo').textContent=obra;
   document.getElementById('proj-cat-conteudo').innerHTML='';
-  ['renders','projeto','fotos','info'].forEach(c=>{
+  ['renders','projeto','fotos','info','apresentacao'].forEach(c=>{
     const b=document.getElementById('btn-cat-'+c);
     if(b) b.style.borderColor='';
   });
@@ -963,7 +1126,7 @@ window.abrirObra=function(obra){
 
 window.abrirInfoObra=async function(){
   const cont=document.getElementById('proj-cat-conteudo');
-  ['renders','projeto','fotos','info'].forEach(c=>{
+  ['renders','projeto','fotos','info','apresentacao'].forEach(c=>{
     const b=document.getElementById('btn-cat-'+c);
     if(b) b.style.borderColor= c==='info'?'var(--ambar)':'';
   });
@@ -974,7 +1137,7 @@ window.abrirInfoObra=async function(){
       headers:{'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON}
     });
     const rows=await res.json();
-    const conteudo=(rows&&rows.length)?rows[0].conteudo:'';
+    const conteudo=(rows&&rows.length&&rows[0].conteudo)?rows[0].conteudo:(PROJETOS_INFO_LOCAL[obraAtual]||'');
     cont.innerHTML=`<div class="proj-cat-title">Informações para o Assistente</div>
       <p class="hint" style="margin-bottom:12px">Estas informações são usadas pelo assistente para responder sobre esta obra. Use o modelo .md fornecido como guia.</p>
       <textarea id="proj-info-txt" rows="16" style="resize:vertical;font-family:monospace;font-size:12px;line-height:1.6">${conteudo.replace(/</g,'&lt;')}</textarea>
@@ -989,6 +1152,35 @@ window.abrirInfoObra=async function(){
   }catch(e){
     cont.innerHTML=`<div class="proj-empty"><div class="proj-empty-icon">⚠️</div><p>${e.message}</p></div>`;
   }
+};
+
+window.abrirApresentacaoObra=function(){
+  const cont=document.getElementById('proj-cat-conteudo');
+  ['renders','projeto','fotos','info','apresentacao'].forEach(c=>{
+    const b=document.getElementById('btn-cat-'+c);
+    if(b) b.style.borderColor= c==='apresentacao'?'var(--ambar)':'';
+  });
+
+  const url=APRESENTACOES_OBRAS[obraAtual];
+  if(!url){
+    cont.innerHTML=`<div class="proj-cat-title">Apresentação</div>
+      <div class="proj-empty">
+        <div class="proj-empty-icon">▣</div>
+        <p>Apresentação ainda não cadastrada</p>
+        <span>Quando houver uma página ou PDF publicado para esta obra, adicione o link em APRESENTACOES_OBRAS.</span>
+      </div>`;
+    return;
+  }
+
+  cont.innerHTML=`<div class="proj-cat-title">Apresentação</div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+      <div>
+        <span class="card-title" style="margin-bottom:4px">Apresentação do ${obraAtual}</span>
+        <p class="hint" style="margin:0">Abrir a apresentação comercial/técnica publicada.</p>
+      </div>
+      <a class="btn-primary" href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px">Abrir apresentação</a>
+    </div>`;
+  window.open(url,'_blank','noopener,noreferrer');
 };
 
 window.importarMdObra=function(input){
@@ -1024,7 +1216,7 @@ window.abrirCategoria=async function(cat){
   const cont=document.getElementById('proj-cat-conteudo');
 
   // Destaca botão ativo
-  ['renders','projeto','fotos','info'].forEach(c=>{
+  ['renders','projeto','fotos','info','apresentacao'].forEach(c=>{
     const b=document.getElementById('btn-cat-'+c);
     if(b) b.style.borderColor = c===cat ? 'var(--ambar)' : '';
   });
@@ -1462,10 +1654,17 @@ async function carregarContextoProjetos(){
       headers:{'apikey':SBASE_ANON,'Authorization':'Bearer '+SBASE_ANON}
     });
     const rows=await res.json();
+    const mapa={...PROJETOS_INFO_LOCAL};
     if(rows&&rows.length){
-      chatContextoProjetos=rows.map(r=>`## ${r.obra}\n${r.conteudo}`).join('\n\n---\n\n');
+      rows.forEach(r=>{
+        if(r.obra&&r.conteudo) mapa[r.obra]=r.conteudo;
+      });
     }
-  }catch(e){ console.warn('Contexto projetos:', e.message); }
+    chatContextoProjetos=Object.entries(mapa).map(([obra,conteudo])=>`## ${obra}\n${conteudo}`).join('\n\n---\n\n');
+  }catch(e){
+    console.warn('Contexto projetos:', e.message);
+    chatContextoProjetos=Object.entries(PROJETOS_INFO_LOCAL).map(([obra,conteudo])=>`## ${obra}\n${conteudo}`).join('\n\n---\n\n');
+  }
 }
 
 function iniciarChat(){
