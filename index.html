@@ -1506,6 +1506,84 @@ function normalizeDateBR(v){
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
 
+function normalizeUnidade(v){
+  const raw=String(v||'').trim();
+  if(!raw) return '';
+  const key=raw
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase()
+    .replace(/\s+/g,'')
+    .replace(/\./g,'');
+  const mapa={
+    'm':'m',
+    'mt':'m',
+    'mts':'m',
+    'metro':'m',
+    'metros':'m',
+    'mlinear':'m',
+    'ml':'m',
+    'm2':'m2',
+    'm²':'m2',
+    'metroquadrado':'m2',
+    'metrosquadrados':'m2',
+    'mq':'m2',
+    'm3':'m3',
+    'm³':'m3',
+    'metrocubico':'m3',
+    'metroscubicos':'m3',
+    'mc':'m3',
+    'un':'un',
+    'und':'un',
+    'unid':'un',
+    'unidade':'un',
+    'unidades':'un',
+    'peca':'un',
+    'pecas':'un',
+    'pc':'un',
+    'pca':'un',
+    'kg':'kg',
+    'kgs':'kg',
+    'quilo':'kg',
+    'quilos':'kg',
+    'kilograma':'kg',
+    'kilogramas':'kg',
+    'saco':'sc',
+    'sacos':'sc',
+    'sc':'sc',
+    'caixa':'cx',
+    'caixas':'cx',
+    'cx':'cx',
+    'rolo':'rl',
+    'rolos':'rl',
+    'rl':'rl',
+    'pacote':'pct',
+    'pacotes':'pct',
+    'pct':'pct'
+  };
+  return mapa[key] || raw.toUpperCase();
+}
+
+function extractDriveId(payload){
+  if(!payload || typeof payload!=='object') return null;
+  const candidatos=[
+    payload.id,
+    payload.fileId,
+    payload.driveId,
+    payload.googleDriveId,
+    payload.data?.id,
+    payload.data?.fileId,
+    payload.file?.id,
+    payload.result?.id
+  ].filter(Boolean);
+  if(candidatos.length) return String(candidatos[0]);
+  const urls=[payload.url,payload.webViewLink,payload.webContentLink,payload.data?.url].filter(Boolean);
+  for(const url of urls){
+    const match=String(url).match(/[?&]id=([^&]+)/) || String(url).match(/\/d\/([^/]+)/);
+    if(match) return match[1];
+  }
+  return null;
+}
+
 function normalizeDespesaIA(parsed){
   const tiposValidos=new Set(['nota_fiscal','pedido','cupom','outro']);
   const itens=Array.isArray(parsed?.itens)?parsed.itens:[];
@@ -1517,7 +1595,7 @@ function normalizeDespesaIA(parsed){
     itens: itens.map(it=>({
       descricao: String(it?.descricao||'').trim(),
       quantidade: parseMoneyBR(it?.quantidade),
-      unidade: String(it?.unidade||'').trim(),
+      unidade: normalizeUnidade(it?.unidade),
       valor_unitario: parseMoneyBR(it?.valor_unitario)
     })).filter(it=>it.descricao || it.quantidade!==null || it.valor_unitario!==null)
   };
@@ -1566,7 +1644,7 @@ window.analisarDespesa=async function(){
       {role:'system',content:'Você extrai dados de documentos brasileiros de compra. Responda somente JSON válido, sem markdown, sem comentários e sem texto extra. Não invente campos. Preserve a descrição dos itens o mais completa possível. Se a foto estiver girada, considere o documento na orientação correta antes de ler. Classifique o tipo pelo conteúdo principal do documento: nota fiscal => nota_fiscal; cupom fiscal/ECF/PDV => cupom; pedido, orçamento, proposta comercial ou orçamento válido por 1 dia => pedido.'},
       {role:'user',content:[
       {type:'image_url',image_url:{url:`data:${despFotoFile.type};base64,${b64}`,detail:'high'}},
-      {type:'text',text:`Analise este documento (nota fiscal, cupom, pedido, orçamento ou proposta de material de construção) e retorne SOMENTE um JSON válido sem markdown com este formato:\n{"tipo":"nota_fiscal|pedido|cupom|outro","fornecedor":"","data":"YYYY-MM-DD","valor_total":null,"itens":[{"descricao":"","quantidade":null,"unidade":"","valor_unitario":null}]}\nRegras:\n- use null quando não conseguir confirmar um valor;\n- mantenha a descrição do item o mais completa possível;\n- quantidade e valor_unitario devem refletir o documento, sem inventar;\n- se houver vários itens, liste todos os que conseguir ler;\n- a data deve ser a data principal do documento; se estiver em formato DD/MM/AA, converta para 20AA;\n- se houver desconto, valor à vista, valor líquido, total com desconto ou valor final a pagar, em valor_total use o valor final após desconto;\n- se aparecerem preço bruto e preço com desconto, priorize o valor final efetivamente pagável;\n- se o documento estiver identificado como ORÇAMENTO, PEDIDO, PROPOSTA ou similar, não classifique como outro;\n- hoje é 2026-05-01, então datas com ano de dois dígitos como 26 normalmente significam 2026.`}
+      {type:'text',text:`Analise este documento (nota fiscal, cupom, pedido, orçamento ou proposta de material de construção) e retorne SOMENTE um JSON válido sem markdown com este formato:\n{"tipo":"nota_fiscal|pedido|cupom|outro","fornecedor":"","data":"YYYY-MM-DD","valor_total":null,"itens":[{"descricao":"","quantidade":null,"unidade":"","valor_unitario":null}]}\nRegras:\n- use null quando não conseguir confirmar um valor;\n- mantenha a descrição do item o mais completa possível;\n- quantidade e valor_unitario devem refletir o documento, sem inventar;\n- para unidade, priorize unidades comuns de obra: m, m2, m3, un, kg, sc, cx, rl, pct;\n- quando aparecer MT, metro, metros ou metro linear, normalize como m;\n- quando aparecer unidade, und, unid, peça ou peças, normalize como un;\n- se houver vários itens, liste todos os que conseguir ler;\n- a data deve ser a data principal do documento; se estiver em formato DD/MM/AA, converta para 20AA;\n- se houver desconto, valor à vista, valor líquido, total com desconto ou valor final a pagar, em valor_total use o valor final após desconto;\n- se aparecerem preço bruto e preço com desconto, priorize o valor final efetivamente pagável;\n- se o documento estiver identificado como ORÇAMENTO, PEDIDO, PROPOSTA ou similar, não classifique como outro;\n- hoje é 2026-05-01, então datas com ano de dois dígitos como 26 normalmente significam 2026.`}
     ]}], 1400);
     const cleaned=txt.replace(/```json|```/g,'').trim();
     const jsonText=(cleaned.match(/\{[\s\S]*\}/)||[])[0]||cleaned;
@@ -1632,7 +1710,7 @@ window.salvarDespesa=async function(){
     if(despFotoFile){
       st.textContent='⏳ Enviando foto para o Drive...';
       const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(despFotoFile);});
-      const ext=despFotoFile.name.split('.').pop()||'jpg';
+      const ext=(despFotoFile.name && despFotoFile.name.includes('.')) ? despFotoFile.name.split('.').pop() : ((despFotoFile.type||'image/jpeg').split('/')[1]||'jpg');
       const upResp=await fetch('https://pderpmbmurtagpdsvzjg.supabase.co/functions/v1/drive-upload',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+SBASE_ANON},
@@ -1644,8 +1722,8 @@ window.salvarDespesa=async function(){
         })
       });
       const upData=await upResp.json();
-      if(upData.id) fotoDriveId=upData.id;
-      else console.warn('Drive upload:', upData);
+      fotoDriveId=extractDriveId(upData);
+      if(!fotoDriveId) console.warn('Drive upload sem id reconhecível:', upData);
     }
     st.textContent='⏳ Salvando no banco...';
     const SURL='https://pderpmbmurtagpdsvzjg.supabase.co';
@@ -1658,7 +1736,8 @@ window.salvarDespesa=async function(){
       const itD=despItens.filter(it=>it.descricao).map(it=>({despesa_id:despId,descricao:it.descricao,quantidade:it.quantidade||0,unidade:it.unidade||'',valor_unitario:it.valor_unitario||0}));
       if(itD.length) await fetch(SURL+'/rest/v1/despesas_itens',{method:'POST',headers:H2,body:JSON.stringify(itD)});
     }
-    st.className='sok'; st.textContent='✓ Despesa salva!'+(fotoDriveId?' Foto no Drive.':'');
+    st.className=fotoDriveId?'sok':'sload';
+    st.textContent='✓ Despesa salva!'+(fotoDriveId?' Foto no Drive.':' Foto salva sem vínculo visível — conferir upload.');
     setTimeout(limparFotoDesp,2000);
   }catch(e){st.className='serr';st.textContent='⚠ Erro: '+e.message;}
   btn.disabled=false; btn.textContent='💾 Salvar Despesa';
@@ -2437,7 +2516,5 @@ function drivePdfUrl(id){ return DRIVE_IMG_PROXY+'?id='+id+'&pdf=1'; }
 </script>
 </body>
 </html>
-
-
 
 
