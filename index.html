@@ -115,8 +115,10 @@ button{cursor:pointer;font-family:'Montserrat',sans-serif}
 .desp-capture-actions button{flex:1;min-width:140px}
 .desp-input-card{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:42px;padding:10px 16px}
 .desp-item{background:var(--argamassa);border:1px solid var(--border);border-radius:8px;padding:10px}
-.desp-item-top{margin-bottom:8px}
+.desp-item input{width:100%}
+.desp-item-top{display:block;width:100%;min-width:0;margin-bottom:8px}
 .desp-item-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end}
+.desp-item-field{min-width:0}
 .desp-item-rm{background:none;border:none;color:#c0392b;cursor:pointer;font-size:18px;padding:0 4px;align-self:center}
 .desp-hist-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
 .desp-hist-actions{display:flex;gap:6px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap}
@@ -799,10 +801,7 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
 #chat-input:focus{ border-color:var(--ambar) }
 #chat-send:hover{ background:var(--asfalto) }
 
-/* Despesas */
-.desp-item{ background:var(--argamassa);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ardosia);display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center }
-.desp-item input{ background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 4px;font-size:12px;height:auto }
-.desp-hist-card{ background:var(--white);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:.75rem }
+/* Despesas */`r`n.desp-hist-card{ background:var(--white);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:.75rem }
 .desp-hist-badge{ display:inline-block;background:var(--ardosia);color:#fff;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-bottom:6px }
 .desp-hist-valor{ font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ambar) }
 </style>
@@ -1564,10 +1563,10 @@ window.analisarDespesa=async function(){
   try{
     const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(despFotoFile);});
     const txt=await openaiChat([
-      {role:'system',content:'Você extrai dados de documentos brasileiros de compra. Responda somente JSON válido, sem markdown, sem comentários e sem texto extra. Não invente campos. Preserve a descrição dos itens o mais completa possível.'},
+      {role:'system',content:'Você extrai dados de documentos brasileiros de compra. Responda somente JSON válido, sem markdown, sem comentários e sem texto extra. Não invente campos. Preserve a descrição dos itens o mais completa possível. Se a foto estiver girada, considere o documento na orientação correta antes de ler. Classifique o tipo pelo conteúdo principal do documento: nota fiscal => nota_fiscal; cupom fiscal/ECF/PDV => cupom; pedido, orçamento, proposta comercial ou orçamento válido por 1 dia => pedido.'},
       {role:'user',content:[
-      {type:'image_url',image_url:{url:`data:${despFotoFile.type};base64,${b64}`}},
-      {type:'text',text:'Analise este documento (nota fiscal, cupom ou pedido de material de construção) e retorne SOMENTE um JSON válido sem markdown com este formato:\n{"tipo":"nota_fiscal|pedido|cupom|outro","fornecedor":"","data":"YYYY-MM-DD","valor_total":null,"itens":[{"descricao":"","quantidade":null,"unidade":"","valor_unitario":null}]}\nRegras:\n- use null quando não conseguir confirmar um valor;\n- mantenha a descrição do item o mais completa possível;\n- quantidade e valor_unitario devem refletir o documento, sem inventar;\n- se houver vários itens, liste todos os que conseguir ler;\n- data em YYYY-MM-DD;\n- valor_total deve ser o total do documento quando estiver legível.'}
+      {type:'image_url',image_url:{url:`data:${despFotoFile.type};base64,${b64}`,detail:'high'}},
+      {type:'text',text:`Analise este documento (nota fiscal, cupom, pedido, orçamento ou proposta de material de construção) e retorne SOMENTE um JSON válido sem markdown com este formato:\n{"tipo":"nota_fiscal|pedido|cupom|outro","fornecedor":"","data":"YYYY-MM-DD","valor_total":null,"itens":[{"descricao":"","quantidade":null,"unidade":"","valor_unitario":null}]}\nRegras:\n- use null quando não conseguir confirmar um valor;\n- mantenha a descrição do item o mais completa possível;\n- quantidade e valor_unitario devem refletir o documento, sem inventar;\n- se houver vários itens, liste todos os que conseguir ler;\n- a data deve ser a data principal do documento; se estiver em formato DD/MM/AA, converta para 20AA;\n- se houver desconto, valor à vista, valor líquido, total com desconto ou valor final a pagar, em valor_total use o valor final após desconto;\n- se aparecerem preço bruto e preço com desconto, priorize o valor final efetivamente pagável;\n- se o documento estiver identificado como ORÇAMENTO, PEDIDO, PROPOSTA ou similar, não classifique como outro;\n- hoje é 2026-05-01, então datas com ano de dois dígitos como 26 normalmente significam 2026.`}
     ]}], 1400);
     const cleaned=txt.replace(/```json|```/g,'').trim();
     const jsonText=(cleaned.match(/\{[\s\S]*\}/)||[])[0]||cleaned;
@@ -2438,4 +2437,7 @@ function drivePdfUrl(id){ return DRIVE_IMG_PROXY+'?id='+id+'&pdf=1'; }
 </script>
 </body>
 </html>
+
+
+
 
