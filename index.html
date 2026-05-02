@@ -1584,6 +1584,12 @@ function extractDriveId(payload){
   return null;
 }
 
+function getUploadErrorMessage(payload){
+  if(!payload) return '';
+  if(typeof payload === 'string') return payload;
+  return payload.error || payload.message || payload.data?.error || '';
+}
+
 function normalizeDespesaIA(parsed){
   const tiposValidos=new Set(['nota_fiscal','pedido','cupom','outro']);
   const itens=Array.isArray(parsed?.itens)?parsed.itens:[];
@@ -1722,8 +1728,17 @@ window.salvarDespesa=async function(){
         })
       });
       const upData=await upResp.json();
+      const uploadError=getUploadErrorMessage(upData);
+      if(!upResp.ok || uploadError){
+        throw new Error(uploadError && /expired|revoked|invalid_grant/i.test(uploadError)
+          ? 'A integração com o Google Drive expirou. A foto não foi anexada. É preciso renovar a conexão do Drive antes de salvar despesas com foto.'
+          : (uploadError || `Falha no upload da foto (${upResp.status}).`));
+      }
       fotoDriveId=extractDriveId(upData);
-      if(!fotoDriveId) console.warn('Drive upload sem id reconhecível:', upData);
+      if(!fotoDriveId){
+        console.warn('Drive upload sem id reconhecível:', upData);
+        throw new Error('A foto foi enviada, mas o Drive não retornou um identificador reconhecível. A despesa não foi salva para evitar histórico sem foto.');
+      }
     }
     st.textContent='⏳ Salvando no banco...';
     const SURL='https://pderpmbmurtagpdsvzjg.supabase.co';
@@ -1736,8 +1751,8 @@ window.salvarDespesa=async function(){
       const itD=despItens.filter(it=>it.descricao).map(it=>({despesa_id:despId,descricao:it.descricao,quantidade:it.quantidade||0,unidade:it.unidade||'',valor_unitario:it.valor_unitario||0}));
       if(itD.length) await fetch(SURL+'/rest/v1/despesas_itens',{method:'POST',headers:H2,body:JSON.stringify(itD)});
     }
-    st.className=fotoDriveId?'sok':'sload';
-    st.textContent='✓ Despesa salva!'+(fotoDriveId?' Foto no Drive.':' Foto salva sem vínculo visível — conferir upload.');
+    st.className='sok';
+    st.textContent='✓ Despesa salva!'+(fotoDriveId?' Foto no Drive.':'');
     setTimeout(limparFotoDesp,2000);
   }catch(e){st.className='serr';st.textContent='⚠ Erro: '+e.message;}
   btn.disabled=false; btn.textContent='💾 Salvar Despesa';
@@ -1804,6 +1819,7 @@ async function carregarHistDesp(){
             <div class="desp-hist-actions">
               ${d.foto_drive_id?`<button class="btn-sm" onclick="verFotoDesp('${d.foto_drive_id}')">📷 Foto</button>`:''}
               <button class="btn-sm" onclick="toggleEditDesp(${d.id})">✏️ Editar</button>
+              <button class="btn-sm" style="color:#a93226;border-color:rgba(169,50,38,.25)" onclick="excluirDesp(${d.id})">🗑 Excluir</button>
             </div>
           </div>
         </div>
@@ -1859,6 +1875,21 @@ window.verFotoDesp=async function(driveId){
 };
 
 window.editarDesp=function(id){ toggleEditDesp(id); };
+
+window.excluirDesp=async function(id){
+  if(!confirm('Tem certeza que deseja excluir esta despesa? Esta ação não poderá ser desfeita.')) return;
+  const SURL='https://pderpmbmurtagpdsvzjg.supabase.co',SKEY='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
+  const H2={'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'};
+  try{
+    const delItens=await fetch(SURL+'/rest/v1/despesas_itens?despesa_id=eq.'+id,{method:'DELETE',headers:H2});
+    if(!delItens.ok && delItens.status!==404) throw new Error(await delItens.text());
+    const delDesp=await fetch(SURL+'/rest/v1/despesas?id=eq.'+id,{method:'DELETE',headers:H2});
+    if(!delDesp.ok) throw new Error(await delDesp.text());
+    carregarHistDesp();
+  }catch(e){
+    alert('Erro ao excluir despesa: '+e.message);
+  }
+};
 
 window.salvarEdicaoDesp=async function(id){
   const SURL='https://pderpmbmurtagpdsvzjg.supabase.co',SKEY='sb_publishable_E_fFSYpICmFlbto06qOi4A_07x-69nj';
