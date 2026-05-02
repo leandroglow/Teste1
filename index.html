@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
@@ -108,6 +108,20 @@ button{cursor:pointer;font-family:'Montserrat',sans-serif}
 .btn-ambar{background:var(--ambar);color:var(--white);border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;cursor:pointer}
 .btn-ambar:hover{background:var(--ambar-light)}
 .banner{background:#FFF8EC;border:1px solid #F5D9A0;border-left:3px solid var(--ambar);border-radius:4px;padding:10px 14px;margin-bottom:.85rem;font-size:12px;color:var(--ardosia);display:none}
+
+/* Despesas */
+.desp-capture-actions{display:flex;gap:10px;flex-wrap:wrap}
+.desp-capture-actions label,
+.desp-capture-actions button{flex:1;min-width:140px}
+.desp-input-card{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:42px;padding:10px 16px}
+.desp-item{background:var(--argamassa);border:1px solid var(--border);border-radius:8px;padding:10px}
+.desp-item-top{margin-bottom:8px}
+.desp-item-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end}
+.desp-item-rm{background:none;border:none;color:#c0392b;cursor:pointer;font-size:18px;padding:0 4px;align-self:center}
+.desp-hist-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.desp-hist-actions{display:flex;gap:6px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap}
+.desp-item-edit-list{display:flex;flex-direction:column;gap:8px}
+.desp-item-field label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--concreto);display:block;margin-bottom:4px}
 
 /* Colab */
 .colab-card{background:var(--argamassa);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px}
@@ -271,7 +285,15 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
   .chat-msg{ max-width:95% }
   #chat-input-area, [id="chat-input-area"]{ padding:10px 12px }
   /* Despesas */
-  .desp-item{ grid-template-columns:1fr 50px 36px 60px; gap:5px; font-size:11px }
+  .desp-capture-actions{flex-direction:column}
+  .desp-capture-actions label,
+  .desp-capture-actions button{min-width:100%}
+  .desp-hist-head{flex-direction:column}
+  .desp-hist-actions{justify-content:flex-start}
+  .desp-item{padding:10px 9px}
+  .desp-item-meta{grid-template-columns:1fr 1fr;gap:8px}
+  .desp-item-meta .desp-item-field:last-of-type{grid-column:1 / -1}
+  .desp-item-rm{justify-self:flex-end}
 }
 /* Garante que o botão enviar nunca some */
 #chat-send{
@@ -685,12 +707,16 @@ select.rel-filter-input{min-width:160px;cursor:pointer}
             <img id="desp-img-preview" style="width:100%;max-height:280px;object-fit:contain;border-radius:6px;border:1px solid var(--border)" />
             <button onclick="limparFotoDesp()" style="position:absolute;top:6px;right:6px;background:rgba(14,20,24,.75);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:15px;line-height:1">×</button>
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <label for="desp-input-foto" style="flex:1;min-width:140px">
-              <div class="btn-primary" style="text-align:center;cursor:pointer">📷 Tirar / Selecionar Foto</div>
-              <input type="file" id="desp-input-foto" accept="image/*" capture="environment" style="display:none" />
+                    <div class="desp-capture-actions">
+            <label for="desp-input-camera">
+              <div class="btn-primary desp-input-card">📷 Tirar foto</div>
+              <input type="file" id="desp-input-camera" accept="image/*" capture="environment" style="display:none" />
             </label>
-            <button id="desp-btn-analisar" class="btn-primary" style="flex:1;min-width:140px;display:none" onclick="analisarDespesa()">✦ Analisar com IA</button>
+            <label for="desp-input-galeria">
+              <div class="btn-secondary desp-input-card">🖼️ Escolher da galeria</div>
+              <input type="file" id="desp-input-galeria" accept="image/*" style="display:none" />
+            </label>
+            <button id="desp-btn-analisar" class="btn-primary" style="display:none" onclick="analisarDespesa()">✦ Analisar com IA</button>
           </div>
         </div>
         <div id="desp-resultado" style="display:none">
@@ -1454,23 +1480,75 @@ async function openaiChat(messages, max_tokens=800){
 // ── DESPESAS ─────────────────────────────────────────────
 let despFotoFile=null, despItens=[];
 
-function popularSelectDesp(){
-  const sel=document.getElementById('desp-obra');
-  sel.innerHTML='<option value="">Selecione...</option>'+OBRAS.map(o=>`<option>${o}</option>`).join('');
+function escAttr(v){
+  return String(v??'')
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
 }
 
-document.getElementById('desp-input-foto').addEventListener('change',e=>{
-  const file=e.target.files[0]; if(!file)return;
+function parseMoneyBR(v){
+  if(v===null||v===undefined||v==='') return null;
+  if(typeof v==='number') return Number.isFinite(v)?v:null;
+  let s=String(v).trim();
+  if(!s) return null;
+  s=s.replace(/[R$\s]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.');
+  s=s.replace(/[^0-9.-]/g,'');
+  const n=Number(s);
+  return Number.isFinite(n)?n:null;
+}
+
+function normalizeDateBR(v){
+  if(!v) return '';
+  const s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m=s.match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
+function normalizeDespesaIA(parsed){
+  const tiposValidos=new Set(['nota_fiscal','pedido','cupom','outro']);
+  const itens=Array.isArray(parsed?.itens)?parsed.itens:[];
+  return {
+    tipo: tiposValidos.has(parsed?.tipo) ? parsed.tipo : 'outro',
+    fornecedor: String(parsed?.fornecedor||'').trim(),
+    data: normalizeDateBR(parsed?.data) || new Date().toISOString().split('T')[0],
+    valor_total: parseMoneyBR(parsed?.valor_total),
+    itens: itens.map(it=>({
+      descricao: String(it?.descricao||'').trim(),
+      quantidade: parseMoneyBR(it?.quantidade),
+      unidade: String(it?.unidade||'').trim(),
+      valor_unitario: parseMoneyBR(it?.valor_unitario)
+    })).filter(it=>it.descricao || it.quantidade!==null || it.valor_unitario!==null)
+  };
+}
+
+function mostrarPreviewDesp(file){
   despFotoFile=file;
   document.getElementById('desp-img-preview').src=URL.createObjectURL(file);
   document.getElementById('desp-foto-preview').style.display='block';
   document.getElementById('desp-btn-analisar').style.display='block';
   document.getElementById('desp-resultado').style.display='none';
+}
+
+function popularSelectDesp(){
+  const sel=document.getElementById('desp-obra');
+  sel.innerHTML='<option value="">Selecione...</option>'+OBRAS.map(o=>`<option>${o}</option>`).join('');
+}
+
+['desp-input-camera','desp-input-galeria'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    const file=e.target.files[0];
+    if(!file) return;
+    mostrarPreviewDesp(file);
+  });
 });
 
 window.limparFotoDesp=function(){
   despFotoFile=null; despItens=[];
-  document.getElementById('desp-input-foto').value='';
+  document.getElementById('desp-input-camera').value='';
+  document.getElementById('desp-input-galeria').value='';
   document.getElementById('desp-foto-preview').style.display='none';
   document.getElementById('desp-btn-analisar').style.display='none';
   document.getElementById('desp-resultado').style.display='none';
@@ -1485,15 +1563,19 @@ window.analisarDespesa=async function(){
   st.className='sload'; st.textContent='⏳ Enviando imagem para análise...';
   try{
     const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(despFotoFile);});
-    const txt=await openaiChat([{role:'user',content:[
+    const txt=await openaiChat([
+      {role:'system',content:'Você extrai dados de documentos brasileiros de compra. Responda somente JSON válido, sem markdown, sem comentários e sem texto extra. Não invente campos. Preserve a descrição dos itens o mais completa possível.'},
+      {role:'user',content:[
       {type:'image_url',image_url:{url:`data:${despFotoFile.type};base64,${b64}`}},
-      {type:'text',text:'Analise este documento (nota fiscal, cupom ou pedido de material de construção) e retorne SOMENTE um JSON válido sem markdown:\n{"tipo":"nota_fiscal|pedido|cupom|outro","fornecedor":"","data":"YYYY-MM-DD","valor_total":0.00,"itens":[{"descricao":"","quantidade":0,"unidade":"","valor_unitario":0.00}]}\nSe não extrair um campo use null. Data em YYYY-MM-DD.'}
-    ]}], 1000);
-    const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+      {type:'text',text:'Analise este documento (nota fiscal, cupom ou pedido de material de construção) e retorne SOMENTE um JSON válido sem markdown com este formato:\n{"tipo":"nota_fiscal|pedido|cupom|outro","fornecedor":"","data":"YYYY-MM-DD","valor_total":null,"itens":[{"descricao":"","quantidade":null,"unidade":"","valor_unitario":null}]}\nRegras:\n- use null quando não conseguir confirmar um valor;\n- mantenha a descrição do item o mais completa possível;\n- quantidade e valor_unitario devem refletir o documento, sem inventar;\n- se houver vários itens, liste todos os que conseguir ler;\n- data em YYYY-MM-DD;\n- valor_total deve ser o total do documento quando estiver legível.'}
+    ]}], 1400);
+    const cleaned=txt.replace(/```json|```/g,'').trim();
+    const jsonText=(cleaned.match(/\{[\s\S]*\}/)||[])[0]||cleaned;
+    const parsed=normalizeDespesaIA(JSON.parse(jsonText));
     document.getElementById('desp-tipo').value=parsed.tipo||'outro';
     document.getElementById('desp-fornecedor').value=parsed.fornecedor||'';
     document.getElementById('desp-data').value=parsed.data||new Date().toISOString().split('T')[0];
-    document.getElementById('desp-valor').value=parsed.valor_total||'';
+    document.getElementById('desp-valor').value=parsed.valor_total??'';
     despItens=parsed.itens||[];
     renderItensDesp();
     st.className='sok'; st.textContent='✓ Dados extraídos — revise e salve';
@@ -1508,17 +1590,31 @@ function renderItensDesp(){
   if(!despItens.length){lista.innerHTML='<p class="obs-none">Nenhum item extraído</p>';return;}
   lista.innerHTML=despItens.map((it,i)=>`
     <div class="desp-item">
-      <input type="text" value="${(it.descricao||'').replace(/"/g,'&quot;')}" placeholder="Descrição" data-i="${i}" data-c="descricao" class="dii" />
-      <input type="number" value="${it.quantidade||''}" placeholder="Qtd" data-i="${i}" data-c="quantidade" class="dii" style="width:60px" />
-      <input type="text" value="${it.unidade||''}" placeholder="Un" data-i="${i}" data-c="unidade" class="dii" style="width:44px" />
-      <input type="number" value="${it.valor_unitario||''}" placeholder="R$" data-i="${i}" data-c="valor_unitario" class="dii" style="width:72px" />
-      <button onclick="despItens.splice(${i},1);renderItensDesp()" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:15px;padding:0 4px" title="Remover">×</button>
+      <div class="desp-item-top desp-item-field">
+        <label>Descrição</label>
+        <input type="text" value="${escAttr(it.descricao)}" placeholder="Descrição completa do item" data-i="${i}" data-c="descricao" class="dii" />
+      </div>
+      <div class="desp-item-meta">
+        <div class="desp-item-field">
+          <label>Quantidade</label>
+          <input type="number" value="${it.quantidade??''}" placeholder="Qtd" data-i="${i}" data-c="quantidade" class="dii" />
+        </div>
+        <div class="desp-item-field">
+          <label>Unidade</label>
+          <input type="text" value="${escAttr(it.unidade)}" placeholder="Un" data-i="${i}" data-c="unidade" class="dii" />
+        </div>
+        <div class="desp-item-field">
+          <label>Valor unitário</label>
+          <input type="number" value="${it.valor_unitario??''}" placeholder="R$" data-i="${i}" data-c="valor_unitario" class="dii" step="0.01" />
+        </div>
+        <button onclick="despItens.splice(${i},1);renderItensDesp()" class="desp-item-rm" title="Remover">×</button>
+      </div>
     </div>`).join('');
   lista.innerHTML+=`<button onclick="despItens.push({descricao:'',quantidade:1,unidade:'un',valor_unitario:0});renderItensDesp()" class="btn-sm" style="margin-top:6px">+ Adicionar item</button>`;
   lista.querySelectorAll('.dii').forEach(el=>{
     el.addEventListener('input',e=>{
       const i=+e.target.dataset.i,c=e.target.dataset.c;
-      despItens[i][c]=c==='quantidade'||c==='valor_unitario'?parseFloat(e.target.value)||0:e.target.value;
+      despItens[i][c]=c==='quantidade'||c==='valor_unitario' ? (e.target.value===''?null:parseFloat(e.target.value)||0) : e.target.value;
     });
   });
 }
@@ -1598,14 +1694,28 @@ async function carregarHistDesp(){
       // Renderiza itens editáveis
       const itensHtml=(d.itens||[]).map((it,i)=>`
         <div class="desp-item" data-id="${d.id}" data-i="${i}">
-          <input type="text" value="${it.descricao||''}" placeholder="Descrição" class="ei-desc" data-id="${d.id}" data-i="${i}" />
-          <input type="number" value="${it.quantidade||''}" placeholder="Qtd" class="ei-qtd" data-id="${d.id}" data-i="${i}" style="width:60px" />
-          <input type="text" value="${it.unidade||''}" placeholder="Un" class="ei-un" data-id="${d.id}" data-i="${i}" style="width:44px" />
-          <input type="number" value="${it.valor_unitario||''}" placeholder="R$" class="ei-vl" data-id="${d.id}" data-i="${i}" style="width:72px" />
+          <div class="desp-item-top desp-item-field">
+            <label>Descrição</label>
+            <input type="text" value="${escAttr(it.descricao||'')}" placeholder="Descrição" class="ei-desc" data-id="${d.id}" data-i="${i}" />
+          </div>
+          <div class="desp-item-meta">
+            <div class="desp-item-field">
+              <label>Quantidade</label>
+              <input type="number" value="${it.quantidade??''}" placeholder="Qtd" class="ei-qtd" data-id="${d.id}" data-i="${i}" />
+            </div>
+            <div class="desp-item-field">
+              <label>Unidade</label>
+              <input type="text" value="${escAttr(it.unidade||'')}" placeholder="Un" class="ei-un" data-id="${d.id}" data-i="${i}" />
+            </div>
+            <div class="desp-item-field">
+              <label>Valor unitário</label>
+              <input type="number" value="${it.valor_unitario??''}" placeholder="R$" class="ei-vl" data-id="${d.id}" data-i="${i}" step="0.01" />
+            </div>
+          </div>
         </div>`).join('');
 
       return `<div class="desp-hist-card" id="dhc-${d.id}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div class="desp-hist-head">
           <div>
             <span class="desp-hist-badge">${tipos[d.tipo]||d.tipo}</span>
             <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:var(--ardosia);margin-top:3px">${d.fornecedor||'—'}</div>
@@ -1613,7 +1723,7 @@ async function carregarHistDesp(){
           </div>
           <div style="text-align:right">
             <div class="desp-hist-valor">R$ ${(d.valor_total||0).toFixed(2).replace('.',',')}</div>
-            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap">
+            <div class="desp-hist-actions">
               ${d.foto_drive_id?`<button class="btn-sm" onclick="verFotoDesp('${d.foto_drive_id}')">📷 Foto</button>`:''}
               <button class="btn-sm" onclick="toggleEditDesp(${d.id})">✏️ Editar</button>
             </div>
@@ -1637,7 +1747,7 @@ async function carregarHistDesp(){
           ${(d.itens||[]).length?`
           <div style="margin-bottom:10px">
             <label class="label" style="margin-bottom:8px;display:block">Itens</label>
-            <div id="ef-itens-${d.id}" style="display:flex;flex-direction:column;gap:6px">
+            <div id="ef-itens-${d.id}" class="desp-item-edit-list">
               ${itensHtml}
             </div>
           </div>`:''}
@@ -2328,3 +2438,4 @@ function drivePdfUrl(id){ return DRIVE_IMG_PROXY+'?id='+id+'&pdf=1'; }
 </script>
 </body>
 </html>
+
